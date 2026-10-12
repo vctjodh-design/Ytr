@@ -18,6 +18,7 @@ const responseCache = new Map<string, { expiresAt: number; value: unknown }>();
 const pendingRequests = new Map<string, Promise<string>>();
 const knownFixtures = new Map<string, Fixture>();
 const knownMatchPaths = new Map<string, string>();
+const knownCompetitionKeys = new Map<string, string>();
 
 function fromCache<T>(key: string): T | undefined {
   const cached = responseCache.get(key);
@@ -101,18 +102,24 @@ function anchorLabel(markdown: string, closingBracket: number): string {
   return "";
 }
 
+function competitionKeyFromPath(path: string): string | null {
+  return path.match(/^\/competition\/(?:scores\/)?([^/?#]+)/i)?.[1]?.toLowerCase() ?? null;
+}
+
 function extractCompetitionSections(markdown: string): Array<{
   index: number;
   name: string;
+  key: string | null;
 }> {
-  const sections: Array<{ index: number; name: string }> = [];
+  const sections: Array<{ index: number; name: string; key: string | null }> = [];
   const expression =
-    /\[!\[Image \d+:\s*[^\]]+\]\([^)]+\)([^\]]+)\]\((?:https?:\/\/)?(?:www\.)?besoccer\.com\/competition\/[^)]+\)/g;
+    /\[!\[Image \d+:\s*[^\]]+\]\([^)]+\)([^\]]+)\]\((?:https?:\/\/)?(?:www\.)?besoccer\.com(\/competition\/[^)\s]+)\)/g;
   for (const match of markdown.matchAll(expression)) {
     if (match.index !== undefined) {
       sections.push({
         index: match.index,
         name: cleanMarkdown(match[1] ?? ""),
+        key: competitionKeyFromPath(match[2] ?? ""),
       });
     }
   }
@@ -120,7 +127,7 @@ function extractCompetitionSections(markdown: string): Array<{
 }
 
 function getCompetitionAt(
-  sections: Array<{ index: number; name: string }>,
+  sections: Array<{ index: number; name: string; key: string | null }>,
   index: number,
   fallback: string,
 ): string {
@@ -130,6 +137,25 @@ function getCompetitionAt(
     selected = section.name || selected;
   }
   return selected;
+}
+
+function getCompetitionKeyAt(
+  sections: Array<{ index: number; name: string; key: string | null }>,
+  index: number,
+): string | null {
+  let selected: string | null = null;
+  for (const section of sections) {
+    if (section.index > index) break;
+    selected = section.key ?? selected;
+  }
+  return selected;
+}
+
+function competitionKeyFromMatchPage(markdown: string): string | null {
+  const match = markdown.match(
+    /\]\(https?:\/\/www\.besoccer\.com(\/competition\/scores\/[^)\s]+)\)/i,
+  );
+  return competitionKeyFromPath(match?.[1] ?? "");
 }
 
 function parseNumber(value: string | undefined): number | null {
@@ -219,6 +245,7 @@ function parseFixtureLinks(
   date: string,
   fallbackCompetition = "Football",
   round: string | null = null,
+  competitionKeys?: Map<string, string | null>,
 ): Fixture[] {
   const fixtures: Fixture[] = [];
   const competitions = extractCompetitionSections(markdown);
@@ -235,6 +262,16 @@ function parseFixtureLinks(
     const imageMatches = Array.from(
       label.matchAll(/!\[Image \d+:\s*([^\]]+)\]\(([^)]+)\)/g),
     );
+    const homeTeam = cleanMarkdown(imageMatches[0]?.[1] ?? "");
+    const awayTeam = cleanMarkdown(imageMatches[1]?.[1] ?? "");
+    if (
+      !homeTeam ||
+      !awayTeam ||
+      /^home team$/i.test(homeTeam) ||
+      /^away team$/i.test(awayTeam)
+    ) {
+      continue;
+    }
     const score = cleanMarkdown(label).match(/\b(\d{1,2})\s*-\s*(\d{1,2})\b/);
     const statusLabel = label.match(/\*\*([^*]+)\*\*\s*$/)?.[1]?.trim();
     const time = label.match(/\b(\d{1,2}:\d{2})\b/)?.[1];
@@ -253,9 +290,9 @@ function parseFixtureLinks(
         fallbackCompetition,
       ),
       round,
-      homeTeam: cleanMarkdown(imageMatches[0]?.[1] ?? "Home team"),
+      homeTeam,
       homeBadgeUrl: imageMatches[0]?.[2] ?? null,
-      awayTeam: cleanMarkdown(imageMatches[1]?.[1] ?? "Away team"),
+      awayTeam,
       awayBadgeUrl: imageMatches[1]?.[2] ?? null,
       kickoff: time
         ? `${dateFromLabel(label, date)} ${time}`
@@ -264,6 +301,10 @@ function parseFixtureLinks(
       homeScore: score ? Number(score[1]) : null,
       awayScore: score ? Number(score[2]) : null,
     });
+    competitionKeys?.set(
+      idMatch[1],
+      getCompetitionKeyAt(competitions, match.index),
+    );
   }
 
   return Array.from(new Map(fixtures.map((fixture) => [fixture.id, fixture])).values());
@@ -779,9 +820,12 @@ export async function listFixturesForDate(date: string): Promise<FixtureList> {
 
   const path = `/livescore/${date}`;
   const markdown = await getMarkdown(path);
-  const fixtures = parseFixtureLinks(markdown, date);
+  const competitionKeys = new Map<string, string | null>();
+  const fixtures = parseFixtureLinks(markdown, date, "Football", null, competitionKeys);
   for (const fixture of fixtures) {
     knownFixtures.set(fixture.id, fixture);
+    const competitionKey = competitionKeys.get(fixture.id);
+    if (competitionKey) knownCompetitionKeys.set(fixture.id, competitionKey);
     try {
       const sourcePath = new URL(fixture.sourceUrl).pathname;
       if (/^\/match\/[a-z0-9-]+\/[a-z0-9-]+\/\d+$/i.test(sourcePath)) {
@@ -830,6 +874,7 @@ export async function getMatchById(
     eventMarkdown,
   ] = sectionMarkdown;
   const knownFixture = knownFixtures.get(matchId);
+  const sourceCompetitionKey = competitionKeyFromMatchPage(mainMarkdown);
   const matchDate =
     knownFixture?.kickoff.slice(0, 10) ??
     inferMatchDate(mainMarkdown) ??
@@ -904,10 +949,12 @@ export async function getMatchById(
   for (const dateResult of roundDateResults) {
     if (dateResult.status !== "fulfilled") continue;
     for (const candidate of dateResult.value.fixtures) {
-      if (
-        normalizeCompetition(candidate.competition) ===
-        normalizeCompetition(fixture.competition)
-      ) {
+      const candidateCompetitionKey = knownCompetitionKeys.get(candidate.id);
+      const belongsToCompetition = sourceCompetitionKey
+        ? candidateCompetitionKey === sourceCompetitionKey
+        : normalizeCompetition(candidate.competition) ===
+          normalizeCompetition(fixture.competition);
+      if (belongsToCompetition) {
         roundFixturesById.set(candidate.id, {
           ...candidate,
           competition: fixture.competition,
