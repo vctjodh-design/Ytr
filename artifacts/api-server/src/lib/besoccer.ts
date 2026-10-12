@@ -452,9 +452,9 @@ export async function listFixturesForDate(date: string): Promise<FixtureList> {
   const markdown = await getMarkdown(path);
   const fixtures = parseFixtureLinks(markdown, date);
   const result = {
-    date,
+    date: new Date(`${date}T00:00:00.000Z`),
     sourceUrl: `${besoccerOrigin}${path}`,
-    fetchedAt: new Date().toISOString(),
+    fetchedAt: new Date(),
     fixtures,
   };
   saveCache(`fixtures:${date}`, result, 60_000);
@@ -536,7 +536,7 @@ export async function getMatchById(matchId: string): Promise<MatchDetails> {
   const result: MatchDetails = {
     fixture,
     sourceUrl: `${besoccerOrigin}${matchPath}`,
-    fetchedAt: new Date().toISOString(),
+    fetchedAt: new Date(),
     roundMatches,
     standings: parseStandings(tableMarkdown ?? ""),
     analysisStats: parseAnalysis(analysisMarkdown ?? ""),

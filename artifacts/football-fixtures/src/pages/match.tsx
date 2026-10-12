@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useGetMatchDetails, getGetMatchDetailsQueryKey } from '@workspace/api-client-react';
 import { ArrowLeft, ArrowUpRight, CircleAlert, ExternalLink, RotateCw } from 'lucide-react';
 import { Link, useParams } from 'wouter';
-import type { Fixture } from '@workspace/api-client-react';
+import type { Fixture, MatchDetails } from '@workspace/api-client-react';
 import { BrandMark } from '@/components/brand-mark';
 import { TeamCrest } from '@/components/team-crest';
 import { FixtureRow, FixtureSkeleton } from '@/components/fixture-row';
@@ -28,7 +28,7 @@ function getState(fixture: Fixture) {
   return fixture.status || 'UPCOMING';
 }
 
-function TabContent({ tab, details }: { tab: Tab; details: NonNullable<ReturnType<typeof useGetMatchDetails>['data']> }) {
+function TabContent({ tab, details }: { tab: Tab; details: MatchDetails }) {
   if (tab === 'Rounds') {
     const matches = details.roundMatches ?? [];
     return matches.length ? <div className="rounds-content">{matches.map((fixture) => <FixtureRow fixture={fixture} key={fixture.id} />)}</div> : <SectionEmpty title="Round fixtures unavailable" detail="The source did not provide other matches from this round." />;
