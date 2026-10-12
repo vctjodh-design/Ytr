@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: fixtures
+    description: BeSoccer fixture and match data
 paths:
   /healthz:
     get:
@@ -24,6 +26,62 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /fixtures:
+    get:
+      operationId: listFixtures
+      tags: [fixtures]
+      summary: Get fixtures for a date
+      parameters:
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Fixtures scraped from BeSoccer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FixtureList"
+        "502":
+          description: BeSoccer data could not be retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /matches/{matchId}:
+    get:
+      operationId: getMatchDetails
+      tags: [fixtures]
+      summary: Get all available details for a BeSoccer match
+      parameters:
+        - name: matchId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9]+$"
+      responses:
+        "200":
+          description: Match tabs parsed from BeSoccer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MatchDetails"
+        "404":
+          description: Match not found or unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: BeSoccer data could not be retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +91,238 @@ components:
           type: string
       required:
         - status
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+    Fixture:
+      type: object
+      properties:
+        id:
+          type: string
+        sourceUrl:
+          type: string
+          format: uri
+        competition:
+          type: string
+        round:
+          type: ["string", "null"]
+        homeTeam:
+          type: string
+        homeBadgeUrl:
+          type: ["string", "null"]
+          format: uri
+        awayTeam:
+          type: string
+        awayBadgeUrl:
+          type: ["string", "null"]
+          format: uri
+        kickoff:
+          type: string
+        status:
+          type: string
+        homeScore:
+          type: ["integer", "null"]
+        awayScore:
+          type: ["integer", "null"]
+      required:
+        - id
+        - sourceUrl
+        - competition
+        - round
+        - homeTeam
+        - homeBadgeUrl
+        - awayTeam
+        - awayBadgeUrl
+        - kickoff
+        - status
+        - homeScore
+        - awayScore
+    FixtureList:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        sourceUrl:
+          type: string
+          format: uri
+        fetchedAt:
+          type: string
+          format: date-time
+        fixtures:
+          type: array
+          items:
+            $ref: "#/components/schemas/Fixture"
+      required: [date, sourceUrl, fetchedAt, fixtures]
+    StandingRow:
+      type: object
+      properties:
+        position:
+          type: integer
+        team:
+          type: string
+        badgeUrl:
+          type: ["string", "null"]
+          format: uri
+        form:
+          type: ["string", "null"]
+        points:
+          type: ["integer", "null"]
+        matchesPlayed:
+          type: ["integer", "null"]
+        wins:
+          type: ["integer", "null"]
+        draws:
+          type: ["integer", "null"]
+        losses:
+          type: ["integer", "null"]
+        goalsFor:
+          type: ["integer", "null"]
+        goalsAgainst:
+          type: ["integer", "null"]
+        goalDifference:
+          type: ["integer", "null"]
+      required:
+        - position
+        - team
+        - badgeUrl
+        - form
+        - points
+        - matchesPlayed
+        - wins
+        - draws
+        - losses
+        - goalsFor
+        - goalsAgainst
+        - goalDifference
+    MatchStat:
+      type: object
+      properties:
+        label:
+          type: string
+        homeValue:
+          type: string
+        awayValue:
+          type: string
+      required: [label, homeValue, awayValue]
+    PreviewFact:
+      type: object
+      properties:
+        label:
+          type: string
+        value:
+          type: string
+      required: [label, value]
+    LineupPlayer:
+      type: object
+      properties:
+        name:
+          type: string
+        number:
+          type: ["integer", "null"]
+        position:
+          type: ["string", "null"]
+        photoUrl:
+          type: ["string", "null"]
+          format: uri
+        isSubstitute:
+          type: boolean
+      required: [name, number, position, photoUrl, isSubstitute]
+    TeamLineup:
+      type: object
+      properties:
+        team:
+          type: string
+        formation:
+          type: ["string", "null"]
+        coach:
+          type: ["string", "null"]
+        players:
+          type: array
+          items:
+            $ref: "#/components/schemas/LineupPlayer"
+      required: [team, formation, coach, players]
+    MatchEvent:
+      type: object
+      properties:
+        minute:
+          type: string
+        eventType:
+          type: string
+        team:
+          type: ["string", "null"]
+        player:
+          type: ["string", "null"]
+        detail:
+          type: ["string", "null"]
+      required: [minute, eventType, team, player, detail]
+    OddsEntry:
+      type: object
+      properties:
+        bookmaker:
+          type: string
+        homeOdds:
+          type: ["number", "null"]
+        drawOdds:
+          type: ["number", "null"]
+        awayOdds:
+          type: ["number", "null"]
+        sourceUrl:
+          type: ["string", "null"]
+          format: uri
+      required: [bookmaker, homeOdds, drawOdds, awayOdds, sourceUrl]
+    MatchDetails:
+      type: object
+      properties:
+        fixture:
+          $ref: "#/components/schemas/Fixture"
+        sourceUrl:
+          type: string
+          format: uri
+        fetchedAt:
+          type: string
+          format: date-time
+        roundMatches:
+          type: array
+          items:
+            $ref: "#/components/schemas/Fixture"
+        standings:
+          type: array
+          items:
+            $ref: "#/components/schemas/StandingRow"
+        analysisStats:
+          type: array
+          items:
+            $ref: "#/components/schemas/MatchStat"
+        previewFacts:
+          type: array
+          items:
+            $ref: "#/components/schemas/PreviewFact"
+        lineups:
+          type: array
+          items:
+            $ref: "#/components/schemas/TeamLineup"
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/MatchEvent"
+        odds:
+          type: array
+          items:
+            $ref: "#/components/schemas/OddsEntry"
+      required:
+        - fixture
+        - sourceUrl
+        - fetchedAt
+        - roundMatches
+        - standings
+        - analysisStats
+        - previewFacts
+        - lineups
+        - events
+        - odds
 
