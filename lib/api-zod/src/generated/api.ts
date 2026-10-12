@@ -55,6 +55,10 @@ export const GetMatchDetailsParams = zod.object({
   "matchId": zod.coerce.string().regex(getMatchDetailsPathMatchIdRegExp)
 })
 
+export const GetMatchDetailsQueryParams = zod.object({
+  "sourcePath": zod.coerce.string().optional().describe('Canonical BeSoccer match path copied from the fixture link')
+})
+
 export const GetMatchDetailsResponse = zod.object({
   "fixture": zod.object({
   "id": zod.string(),
@@ -134,6 +138,18 @@ export const GetMatchDetailsResponse = zod.object({
   "drawOdds": zod.number().nullable(),
   "awayOdds": zod.number().nullable(),
   "sourceUrl": zod.string().url().nullable()
+})),
+  "sourcePages": zod.array(zod.object({
+  "tab": zod.string(),
+  "sourceUrl": zod.string().url(),
+  "sections": zod.array(zod.object({
+  "title": zod.string(),
+  "text": zod.array(zod.string()),
+  "tables": zod.array(zod.object({
+  "headers": zod.array(zod.string()),
+  "rows": zod.array(zod.array(zod.string()))
+}))
+}))
 }))
 })
 

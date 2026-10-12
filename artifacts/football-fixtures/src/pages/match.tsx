@@ -7,8 +7,9 @@ import { BrandMark } from '@/components/brand-mark';
 import { TeamCrest } from '@/components/team-crest';
 import { FixtureRow, FixtureSkeleton } from '@/components/fixture-row';
 import { SectionEmpty } from '@/components/section-empty';
+import { MatchSourceContent } from '@/components/match-source-content';
 
-const tabs = ['Rounds', 'Standings', 'Lineups', 'Analysis', 'Preview', 'Events', 'Odds'] as const;
+const tabs = ['Rounds', 'Standings', 'Analysis', 'Preview', 'Lineups', 'Odds', 'Events'] as const;
 type Tab = typeof tabs[number];
 
 function formatKickoff(kickoff: string) {
@@ -36,12 +37,12 @@ function TabContent({ tab, details }: { tab: Tab; details: MatchDetails }) {
   if (tab === 'Standings') {
     const rows = details.standings ?? [];
     return rows.length ? (
-      <div className="table-scroll"><table className="standings-table"><thead><tr><th>#</th><th>CLUB</th><th>MP</th><th>W</th><th>D</th><th>L</th><th>GD</th><th>PTS</th></tr></thead><tbody>{rows.map((row, index) => <tr key={`${row.team}-${index}`}><td className="position-cell">{row.position}</td><td><span className="standing-team"><TeamCrest src={row.badgeUrl} name={row.team} size="sm" />{row.team}</span></td><td>{row.matchesPlayed ?? '—'}</td><td>{row.wins ?? '—'}</td><td>{row.draws ?? '—'}</td><td>{row.losses ?? '—'}</td><td>{row.goalDifference ?? '—'}</td><td className="points-cell">{row.points ?? '—'}</td></tr>)}</tbody></table></div>
+      <div className="table-scroll"><table className="standings-table"><thead><tr><th>#</th><th>CLUB</th><th>MP</th><th>W</th><th>D</th><th>L</th><th>GF</th><th>GA</th><th>GD</th><th>PTS</th><th>FORM</th></tr></thead><tbody>{rows.map((row, index) => <tr key={`${row.team}-${index}`}><td className="position-cell">{row.position}</td><td><span className="standing-team"><TeamCrest src={row.badgeUrl} name={row.team} size="sm" />{row.team}</span></td><td>{row.matchesPlayed ?? '—'}</td><td>{row.wins ?? '—'}</td><td>{row.draws ?? '—'}</td><td>{row.losses ?? '—'}</td><td>{row.goalsFor ?? '—'}</td><td>{row.goalsAgainst ?? '—'}</td><td>{row.goalDifference ?? '—'}</td><td className="points-cell">{row.points ?? '—'}</td><td>{row.form ?? '—'}</td></tr>)}</tbody></table></div>
     ) : <SectionEmpty title="Standings not supplied" />;
   }
   if (tab === 'Lineups') {
     const lineups = details.lineups ?? [];
-    return lineups.length ? <div className="lineup-columns">{lineups.map((lineup) => <section className="lineup-team" key={lineup.team}><div className="lineup-team-head"><div><h3>{lineup.team}</h3><span>{lineup.formation || 'FORMATION N/A'}{lineup.coach ? ` · ${lineup.coach}` : ''}</span></div><span className="player-count">{lineup.players?.length ?? 0}</span></div>{lineup.players?.length ? <div className="player-list">{lineup.players.map((player, index) => <div className={`player-row ${player.isSubstitute ? 'is-substitute' : ''}`} key={`${player.name}-${index}`}><span className="player-number">{player.number ?? '—'}</span><span>{player.name}</span><span className="player-position">{player.position || (player.isSubstitute ? 'SUB' : '')}</span></div>)}</div> : <SectionEmpty title="Players not supplied" />}</section>)}</div> : <SectionEmpty title="Lineups not available" detail="Lineups have not been published or were not included in the scraped match details." />;
+        return lineups.length ? <div className="lineup-columns">{lineups.map((lineup) => <section className="lineup-team" key={lineup.team}><div className="lineup-team-head"><div><h3>{lineup.team}</h3><span>{lineup.formation || 'FORMATION N/A'}{lineup.coach ? ` · ${lineup.coach}` : ''}</span></div><span className="player-count">{lineup.players?.length ?? 0}</span></div>{lineup.players?.length ? <div className="player-list">{lineup.players.map((player, index) => <div className={`player-row ${player.isSubstitute ? 'is-substitute' : ''}`} key={`${player.name}-${index}`}><span className="player-number">{player.number ?? '—'}</span>{player.photoUrl ? <img className="player-photo" src={player.photoUrl} alt="" loading="lazy" /> : null}<span>{player.name}</span><span className="player-position">{player.position || (player.isSubstitute ? 'SUB' : '')}</span></div>)}</div> : <SectionEmpty title="Players not supplied" />}</section>)}</div> : <SectionEmpty title="Lineups not available" detail="Lineups have not been published or were not included in the scraped match details." />;
   }
   if (tab === 'Analysis') {
     const stats = details.analysisStats ?? [];
@@ -60,9 +61,15 @@ function TabContent({ tab, details }: { tab: Tab; details: MatchDetails }) {
 }
 
 export default function MatchPage() {
-  const { matchId = '' } = useParams<{ matchId: string }>();
+  const { homeSlug, awaySlug, matchId = '' } = useParams<{
+    homeSlug?: string;
+    awaySlug?: string;
+    matchId: string;
+  }>();
+  const requestParams =
+    homeSlug && awaySlug ? { sourcePath: `/match/${homeSlug}/${awaySlug}/${matchId}` } : undefined;
   const [tab, setTab] = useState<Tab>('Rounds');
-  const { data, isLoading, isError, refetch, isFetching } = useGetMatchDetails(matchId, { query: { enabled: Boolean(matchId), queryKey: getGetMatchDetailsQueryKey(matchId) } });
+  const { data, isLoading, isError, refetch, isFetching } = useGetMatchDetails(matchId, requestParams, { query: { enabled: Boolean(matchId), queryKey: getGetMatchDetailsQueryKey(matchId, requestParams) } });
   const fixture = data?.fixture;
 
   return (
@@ -87,10 +94,11 @@ export default function MatchPage() {
               </div>
               <div className="match-hero-foot"><span>THE MATCH, IN CONTEXT</span><a href={data.sourceUrl || fixture.sourceUrl} target="_blank" rel="noreferrer" data-testid="link-match-source">ORIGINAL SOURCE <ExternalLink size={12} /></a></div>
             </section>
-            <nav className="match-tabs" aria-label="Match information sections">{tabs.map((item, index) => <button className={tab === item ? 'match-tab active' : 'match-tab'} key={item} onClick={() => setTab(item)} data-testid={`tab-${item.toLowerCase()}`}><span className="tab-index">{String(index + 1).padStart(2, '0')}</span>{item}</button>)}</nav>
+            <nav className="match-tabs" aria-label="Match information sections">{tabs.map((item, index) => <button type="button" aria-pressed={tab === item} className={tab === item ? 'match-tab active' : 'match-tab'} key={item} onClick={() => setTab(item)} data-testid={`tab-${item.toLowerCase()}`}><span className="tab-index">{String(index + 1).padStart(2, '0')}</span>{item}</button>)}</nav>
             <section className="match-data-panel" key={tab}>
               <div className="data-panel-head"><div><p className="eyebrow"><span className="eyebrow-mark">{String(tabs.indexOf(tab) + 1).padStart(2, '0')}</span> MATCH INTELLIGENCE</p><h2>{tab}<em>{tab === 'Rounds' ? ' around it.' : tab === 'Standings' ? ' table.' : tab === 'Lineups' ? ' sheet.' : tab === 'Analysis' ? ' desk.' : tab === 'Preview' ? ' notes.' : tab === 'Events' ? ' log.' : ' market.'}</em></h2></div><span className="data-source">{tab.toUpperCase()} / SOURCE DATA</span></div>
               <TabContent tab={tab} details={data} />
+              <MatchSourceContent page={data.sourcePages?.find((page) => page.tab.trim().toLowerCase() === tab.toLowerCase())} tab={tab} />
             </section>
             <footer className="page-foot match-foot"><span>TOUCHLINE DESK <b>·</b> {fixture.id}</span><span>{data.fetchedAt ? `SOURCE CAPTURED ${new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(data.fetchedAt))}` : 'SOURCE CAPTURE TIME NOT PROVIDED'}<a href={data.sourceUrl || fixture.sourceUrl} target="_blank" rel="noreferrer" aria-label="Open original match source"><ExternalLink size={12} /></a></span></footer>
           </>

@@ -63,6 +63,12 @@ paths:
           schema:
             type: string
             pattern: "^[0-9]+$"
+        - name: sourcePath
+          in: query
+          required: false
+          description: Canonical BeSoccer match path copied from the fixture link
+          schema:
+            type: string
       responses:
         "200":
           description: Match tabs parsed from BeSoccer
@@ -275,6 +281,47 @@ components:
           type: ["string", "null"]
           format: uri
       required: [bookmaker, homeOdds, drawOdds, awayOdds, sourceUrl]
+    MatchContentTable:
+      type: object
+      properties:
+        headers:
+          type: array
+          items:
+            type: string
+        rows:
+          type: array
+          items:
+            type: array
+            items:
+              type: string
+      required: [headers, rows]
+    MatchContentSection:
+      type: object
+      properties:
+        title:
+          type: string
+        text:
+          type: array
+          items:
+            type: string
+        tables:
+          type: array
+          items:
+            $ref: "#/components/schemas/MatchContentTable"
+      required: [title, text, tables]
+    MatchContentPage:
+      type: object
+      properties:
+        tab:
+          type: string
+        sourceUrl:
+          type: string
+          format: uri
+        sections:
+          type: array
+          items:
+            $ref: "#/components/schemas/MatchContentSection"
+      required: [tab, sourceUrl, sections]
     MatchDetails:
       type: object
       properties:
@@ -314,6 +361,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/OddsEntry"
+        sourcePages:
+          type: array
+          items:
+            $ref: "#/components/schemas/MatchContentPage"
       required:
         - fixture
         - sourceUrl
@@ -325,4 +376,5 @@ components:
         - lineups
         - events
         - odds
+        - sourcePages
 

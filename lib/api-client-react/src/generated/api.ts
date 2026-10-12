@@ -18,6 +18,7 @@ import type {
 import type {
   ErrorResponse,
   FixtureList,
+  GetMatchDetailsParams,
   HealthStatus,
   ListFixturesParams,
   MatchDetails
@@ -212,20 +213,29 @@ export function useListFixtures<TData = Awaited<ReturnType<typeof listFixtures>>
 
 
 
-export const getGetMatchDetailsUrl = (matchId: string,) => {
+export const getGetMatchDetailsUrl = (matchId: string,
+    params?: GetMatchDetailsParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/matches/${matchId}`
+  return stringifiedParams.length > 0 ? `/api/matches/${matchId}?${stringifiedParams}` : `/api/matches/${matchId}`
 }
 
 /**
  * @summary Get all available details for a BeSoccer match
  */
-export const getMatchDetails = async (matchId: string, options?: Parameters<typeof customFetch>[1]): Promise<MatchDetails> => {
+export const getMatchDetails = async (matchId: string,
+    params?: GetMatchDetailsParams, options?: Parameters<typeof customFetch>[1]): Promise<MatchDetails> => {
 
-  return customFetch<MatchDetails>(getGetMatchDetailsUrl(matchId),
+  return customFetch<MatchDetails>(getGetMatchDetailsUrl(matchId,params),
   {
     ...options,
     method: 'GET'
@@ -238,23 +248,25 @@ export const getMatchDetails = async (matchId: string, options?: Parameters<type
 
 
 
-export const getGetMatchDetailsQueryKey = (matchId: string,) => {
+export const getGetMatchDetailsQueryKey = (matchId: string,
+    params?: GetMatchDetailsParams,) => {
     return [
-    `/api/matches/${matchId}`
+    `/api/matches/${matchId}`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetMatchDetailsQueryOptions = <TData = Awaited<ReturnType<typeof getMatchDetails>>, TError = ErrorType<ErrorResponse>>(matchId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMatchDetails>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetMatchDetailsQueryOptions = <TData = Awaited<ReturnType<typeof getMatchDetails>>, TError = ErrorType<ErrorResponse>>(matchId: string,
+    params?: GetMatchDetailsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMatchDetails>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetMatchDetailsQueryKey(matchId);
+  const queryKey =  queryOptions?.queryKey ?? getGetMatchDetailsQueryKey(matchId,params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMatchDetails>>> = ({ signal }) => getMatchDetails(matchId, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMatchDetails>>> = ({ signal }) => getMatchDetails(matchId,params, { signal, ...requestOptions });
 
 
 
@@ -272,11 +284,12 @@ export type GetMatchDetailsQueryError = ErrorType<ErrorResponse>
  */
 
 export function useGetMatchDetails<TData = Awaited<ReturnType<typeof getMatchDetails>>, TError = ErrorType<ErrorResponse>>(
- matchId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMatchDetails>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ matchId: string,
+    params?: GetMatchDetailsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMatchDetails>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetMatchDetailsQueryOptions(matchId,options)
+  const queryOptions = getGetMatchDetailsQueryOptions(matchId,params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

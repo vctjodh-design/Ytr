@@ -16,11 +16,23 @@ function matchState(fixture: Fixture) {
   return timeLabel(fixture.kickoff);
 }
 
+function matchHref(fixture: Fixture) {
+  try {
+    const path = new URL(fixture.sourceUrl).pathname.replace(/\/+$/, '');
+    if (/^\/match\/[a-z0-9-]+\/[a-z0-9-]+\/\d+$/i.test(path) && path.endsWith(`/${fixture.id}`)) {
+      return path;
+    }
+  } catch {
+    // Keep legacy fixture links usable if the source URL is malformed.
+  }
+  return `/match/${encodeURIComponent(fixture.id)}`;
+}
+
 export function FixtureRow({ fixture }: { fixture: Fixture }) {
   const isLive = matchState(fixture) === 'LIVE';
   const hasScore = fixture.homeScore !== null && fixture.awayScore !== null;
   return (
-    <Link href={`/match/${encodeURIComponent(fixture.id)}`} className="fixture-row" data-testid={`link-fixture-${fixture.id}`}>
+    <Link href={matchHref(fixture)} className="fixture-row" data-testid={`link-fixture-${fixture.id}`}>
       <div className="fixture-state">
         <span className={isLive ? 'live-label' : 'kickoff-label'}>{isLive && <i />}{matchState(fixture)}</span>
         {fixture.round && <span className="fixture-round">{fixture.round}</span>}

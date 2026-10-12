@@ -37,6 +37,7 @@ function Router() {
     <RoutedErrorBoundary>
       <Switch>
         <Route path="/" component={HomePage} />
+        <Route path="/match/:homeSlug/:awaySlug/:matchId" component={MatchPage} />
         <Route path="/match/:matchId" component={MatchPage} />
         <Route component={NotFound} />
       </Switch>

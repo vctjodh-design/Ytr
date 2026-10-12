@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import {
   GetMatchDetailsParams,
+  GetMatchDetailsQueryParams,
   GetMatchDetailsResponse,
   ListFixturesResponse,
 } from "@workspace/api-zod";
@@ -35,8 +36,17 @@ router.get("/matches/:matchId", async (req, res): Promise<void> => {
     return;
   }
 
+  const query = GetMatchDetailsQueryParams.safeParse(req.query);
+  if (!query.success) {
+    res.status(400).json({ error: "The BeSoccer match path is invalid." });
+    return;
+  }
+
   try {
-    const details = await getMatchById(params.data.matchId);
+    const details = await getMatchById(
+      params.data.matchId,
+      query.data.sourcePath,
+    );
     res.json(GetMatchDetailsResponse.parse(details));
   } catch (error) {
     if (

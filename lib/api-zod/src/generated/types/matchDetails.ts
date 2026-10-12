@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { Fixture } from './fixture';
+import type { MatchContentPage } from './matchContentPage';
 import type { MatchEvent } from './matchEvent';
 import type { MatchStat } from './matchStat';
 import type { OddsEntry } from './oddsEntry';
@@ -24,4 +25,5 @@ export interface MatchDetails {
   lineups: TeamLineup[];
   events: MatchEvent[];
   odds: OddsEntry[];
+  sourcePages: MatchContentPage[];
 }

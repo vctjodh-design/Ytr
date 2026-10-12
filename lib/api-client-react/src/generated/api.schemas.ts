@@ -119,6 +119,23 @@ export interface OddsEntry {
   sourceUrl: string | null;
 }
 
+export interface MatchContentTable {
+  headers: string[];
+  rows: string[][];
+}
+
+export interface MatchContentSection {
+  title: string;
+  text: string[];
+  tables: MatchContentTable[];
+}
+
+export interface MatchContentPage {
+  tab: string;
+  sourceUrl: string;
+  sections: MatchContentSection[];
+}
+
 export interface MatchDetails {
   fixture: Fixture;
   sourceUrl: string;
@@ -130,9 +147,17 @@ export interface MatchDetails {
   lineups: TeamLineup[];
   events: MatchEvent[];
   odds: OddsEntry[];
+  sourcePages: MatchContentPage[];
 }
 
 export type ListFixturesParams = {
 date: string;
+};
+
+export type GetMatchDetailsParams = {
+/**
+ * Canonical BeSoccer match path copied from the fixture link
+ */
+sourcePath?: string;
 };
 

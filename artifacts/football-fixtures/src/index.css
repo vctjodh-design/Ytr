@@ -1515,13 +1515,21 @@ a {
 
 .player-row {
   display: grid;
-  grid-template-columns: 26px 1fr auto;
+  grid-template-columns: 26px 22px minmax(0, 1fr) auto;
   gap: 8px;
   align-items: center;
   min-height: 35px;
   border-bottom: 1px solid #eeebe4;
   padding: 0 14px;
   font-size: 11px;
+}
+
+.player-photo {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #e9e8df;
 }
 
 .player-row:last-child {
@@ -1676,6 +1684,157 @@ a {
   margin-top: 25px;
 }
 
+.match-source-content {
+  margin-top: 34px;
+  border-top: 2px solid #bfc8bb;
+  background: rgba(232, 231, 221, .42);
+}
+
+.source-content-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 15px 17px;
+  border-bottom: 1px solid #dedacf;
+}
+
+.source-content-head > div {
+  min-width: 0;
+}
+
+.source-content-kicker {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--pitch);
+  font: 500 9px var(--mono);
+  letter-spacing: .1em;
+}
+
+.source-content-head p {
+  margin: 5px 0 0 20px;
+  color: #7b827a;
+  font-size: 10px;
+}
+
+.source-page-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--pitch);
+  font: 500 8px var(--mono);
+  letter-spacing: .08em;
+  white-space: nowrap;
+}
+
+.source-url-text {
+  max-width: 45%;
+  overflow-wrap: anywhere;
+  color: #777f77;
+  font: 400 9px/1.5 var(--mono);
+}
+
+.source-sections {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.source-section {
+  min-width: 0;
+  padding: 17px 18px;
+  border: 1px solid #e0dcd2;
+  background: rgba(251, 250, 246, .84);
+}
+
+.source-section h3 {
+  margin: 0 0 11px;
+  color: var(--ink);
+  font: 600 19px/1.15 var(--display);
+  letter-spacing: .025em;
+  text-transform: uppercase;
+}
+
+.source-text-entry {
+  margin: 0 0 9px;
+  color: #4f5b54;
+  font-size: 12px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.source-text-entry:last-of-type {
+  margin-bottom: 0;
+}
+
+.source-table-scroll {
+  max-width: 100%;
+  margin-top: 14px;
+  overflow-x: auto;
+  border: 1px solid #e0dcd2;
+  background: #fbfaf6;
+}
+
+.source-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 11px;
+}
+
+.source-table th,
+.source-table td {
+  min-width: 72px;
+  padding: 9px 12px;
+  border-right: 1px solid #e8e4dc;
+  border-bottom: 1px solid #e8e4dc;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.source-table th {
+  color: #69756f;
+  background: #e9e8df;
+  font: 500 8px/1.5 var(--mono);
+  letter-spacing: .055em;
+}
+
+.source-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.source-table th:last-child,
+.source-table td:last-child {
+  border-right: 0;
+}
+
+.source-content-empty,
+.match-source-empty {
+  margin: 0;
+  padding: 17px;
+  color: #778078;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.match-source-empty {
+  margin-top: 34px;
+  border-top: 2px solid #bfc8bb;
+  background: rgba(232, 231, 221, .42);
+}
+
+.source-empty-index {
+  color: var(--pitch);
+  font: 500 8px var(--mono);
+  letter-spacing: .1em;
+}
+
+.match-source-empty p {
+  margin: 6px 0 0;
+}
+
 .match-loading {
   padding-top: 10px;
 }
@@ -1734,6 +1893,71 @@ a {
   }
   .back-link {
     font-size: 8px;
+  }
+  .match-page {
+    padding: 19px 14px 24px;
+  }
+  .match-scoreboard {
+    grid-template-columns: minmax(0, 1fr) 108px minmax(0, 1fr);
+    gap: 5px;
+    min-height: 174px;
+    padding: 17px 0;
+  }
+  .score-team {
+    flex-direction: column;
+    gap: 8px;
+    text-align: center;
+  }
+  .score-away {
+    flex-direction: column;
+    text-align: center;
+  }
+  .score-team h1 {
+    font-size: clamp(17px, 5vw, 24px);
+  }
+  .crest-lg {
+    width: 48px;
+    height: 48px;
+  }
+  .big-score {
+    font-size: 42px;
+    gap: 6px;
+  }
+  .kickoff-detail {
+    font-size: 9px;
+  }
+  .match-hero {
+    padding: 16px 15px 0;
+  }
+  .match-tab {
+    padding: 11px 12px;
+  }
+  .data-panel-head {
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .data-source {
+    text-align: right;
+    line-height: 1.5;
+    max-width: 90px;
+  }
+  .lineup-columns,
+  .preview-grid {
+    grid-template-columns: 1fr;
+  }
+  .source-content-head {
+    align-items: flex-start;
+    padding: 13px;
+  }
+  .source-sections {
+    padding: 9px;
+  }
+  .source-section {
+    padding: 14px 12px;
+  }
+  .source-table th,
+  .source-table td {
+    padding: 8px 9px;
   }
   .desk-layout {
     display: block;
