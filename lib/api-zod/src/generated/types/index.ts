@@ -15,6 +15,8 @@ export * from './getMatchOddsParams';
 export * from './healthStatus';
 export * from './lineupPlayer';
 export * from './listFixturesParams';
+export * from './matchContentBlock';
+export * from './matchContentBlockType';
 export * from './matchContentPage';
 export * from './matchContentSection';
 export * from './matchContentTable';

@@ -185,7 +185,15 @@ export const GetMatchDetailsResponse = zod.object({
   "tables": zod.array(zod.object({
   "headers": zod.array(zod.string()),
   "rows": zod.array(zod.array(zod.string()))
-}))
+})),
+  "blocks": zod.array(zod.object({
+  "type": zod.enum(['text', 'image', 'table']),
+  "text": zod.string().optional(),
+  "imageUrl": zod.string().url().optional(),
+  "imageAlt": zod.string().optional(),
+  "headers": zod.array(zod.string()).optional(),
+  "rows": zod.array(zod.array(zod.string())).optional()
+})).optional()
 }))
 }))
 })
@@ -261,7 +269,15 @@ export const GetTeamDetailsResponse = zod.object({
   "tables": zod.array(zod.object({
   "headers": zod.array(zod.string()),
   "rows": zod.array(zod.array(zod.string()))
-}))
+})),
+  "blocks": zod.array(zod.object({
+  "type": zod.enum(['text', 'image', 'table']),
+  "text": zod.string().optional(),
+  "imageUrl": zod.string().url().optional(),
+  "imageAlt": zod.string().optional(),
+  "headers": zod.array(zod.string()).optional(),
+  "rows": zod.array(zod.array(zod.string())).optional()
+})).optional()
 }))
 }))
 })

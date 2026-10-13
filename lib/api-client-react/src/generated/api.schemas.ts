@@ -166,10 +166,29 @@ export interface MatchContentTable {
   rows: string[][];
 }
 
+export type MatchContentBlockType = typeof MatchContentBlockType[keyof typeof MatchContentBlockType];
+
+
+export const MatchContentBlockType = {
+  text: 'text',
+  image: 'image',
+  table: 'table',
+} as const;
+
+export interface MatchContentBlock {
+  type: MatchContentBlockType;
+  text?: string;
+  imageUrl?: string;
+  imageAlt?: string;
+  headers?: string[];
+  rows?: string[][];
+}
+
 export interface MatchContentSection {
   title: string;
   text: string[];
   tables: MatchContentTable[];
+  blocks?: MatchContentBlock[];
 }
 
 export interface MatchContentPage {

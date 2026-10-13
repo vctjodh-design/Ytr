@@ -5,10 +5,12 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { MatchContentBlock } from './matchContentBlock';
 import type { MatchContentTable } from './matchContentTable';
 
 export interface MatchContentSection {
   title: string;
   text: string[];
   tables: MatchContentTable[];
+  blocks?: MatchContentBlock[];
 }

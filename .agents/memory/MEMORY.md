@@ -1,1 +1,2 @@
 - [BeSoccer fixture lists](besoccer-fixtures.md) — paginate to the final marker, include unmarked AJAX cards, and preserve source-local dates for upcoming-date labels.
+- [BeSoccer team content](besoccer-team-content.md) — parse team tabs from ordered HTML modules; markdown collapses images and page structure.

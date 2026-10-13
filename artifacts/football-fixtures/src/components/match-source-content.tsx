@@ -45,26 +45,64 @@ export function MatchSourceContent({ page, tab }: { page?: SourcePage; tab: stri
           {page.sections.map((section, sectionIndex) => (
             <article className="source-section" key={`${section.title}-${sectionIndex}`}>
               <h3>{section.title}</h3>
-              {section.text.map((entry, textIndex) => (
-                <p className="source-text-entry" key={`${textIndex}-${entry}`}>{entry}</p>
-              ))}
-              {section.tables.map((table, tableIndex) => (
-                <div className="source-table-scroll" key={`table-${tableIndex}`}>
-                  <table className="source-table">
-                    {table.headers.length > 0 && (
-                      <thead><tr>{table.headers.map((header, headerIndex) => <th key={`${headerIndex}-${header}`}>{header}</th>)}</tr></thead>
-                    )}
-                    <tbody>
-                      {table.rows.map((row, rowIndex) => (
-                        <tr key={`row-${rowIndex}`}>
-                          {row.map((value, cellIndex) => <td key={`${cellIndex}-${value}`}>{value}</td>)}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+              {section.blocks?.length ? (
+                <div className="source-content-blocks">
+                  {section.blocks.map((block, blockIndex) => {
+                    if (block.type === 'image' && block.imageUrl) {
+                      return (
+                        <figure className="source-image-block" key={`image-${blockIndex}`}>
+                          <img src={block.imageUrl} alt={block.imageAlt || ''} loading="lazy" />
+                          {block.imageAlt && <figcaption>{block.imageAlt}</figcaption>}
+                        </figure>
+                      );
+                    }
+                    if (block.type === 'table') {
+                      return (
+                        <div className="source-table-scroll" key={`table-${blockIndex}`}>
+                          <table className="source-table">
+                            {block.headers?.length ? (
+                              <thead><tr>{block.headers.map((header, headerIndex) => <th key={`${headerIndex}-${header}`}>{header}</th>)}</tr></thead>
+                            ) : null}
+                            <tbody>
+                              {block.rows?.map((row, rowIndex) => (
+                                <tr key={`row-${rowIndex}`}>
+                                  {row.map((value, cellIndex) => <td key={`${cellIndex}-${value}`}>{value}</td>)}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      );
+                    }
+                    return block.text ? (
+                      <p className="source-text-entry" key={`text-${blockIndex}`}>{block.text}</p>
+                    ) : null;
+                  })}
                 </div>
-              ))}
-              {section.text.length === 0 && section.tables.length === 0 && (
+              ) : (
+                <>
+                  {section.text.map((entry, textIndex) => (
+                    <p className="source-text-entry" key={`${textIndex}-${entry}`}>{entry}</p>
+                  ))}
+                  {section.tables.map((table, tableIndex) => (
+                    <div className="source-table-scroll" key={`table-${tableIndex}`}>
+                      <table className="source-table">
+                        {table.headers.length > 0 && (
+                          <thead><tr>{table.headers.map((header, headerIndex) => <th key={`${headerIndex}-${header}`}>{header}</th>)}</tr></thead>
+                        )}
+                        <tbody>
+                          {table.rows.map((row, rowIndex) => (
+                            <tr key={`row-${rowIndex}`}>
+                              {row.map((value, cellIndex) => <td key={`${cellIndex}-${value}`}>{value}</td>)}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ))}
+                </>
+              )}
+              {(!section.blocks?.length && section.text.length === 0 && section.tables.length === 0) && (
                 <p className="source-content-empty">No text or tables were parsed in this section.</p>
               )}
             </article>

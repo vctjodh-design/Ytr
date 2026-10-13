@@ -7,6 +7,7 @@ export type {
   LineupPlayer,
   ListFixturesParams,
   MatchContentPage,
+  MatchContentBlock,
   MatchContentSection,
   MatchContentTable,
   MatchDetails,
