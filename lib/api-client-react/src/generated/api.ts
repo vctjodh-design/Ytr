@@ -24,6 +24,7 @@ import type {
   ListFixturesParams,
   MatchDetails,
   MatchOdds,
+  PlayerDetails,
   TeamDetails
 } from './api.schemas';
 
@@ -459,6 +460,83 @@ export function useGetTeamDetails<TData = Awaited<ReturnType<typeof getTeamDetai
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetTeamDetailsQueryOptions(teamSlug,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetPlayerDetailsUrl = (playerSlug: string,) => {
+
+
+
+
+  return `/api/players/${playerSlug}`
+}
+
+/**
+ * @summary Get BeSoccer player profile and tab data
+ */
+export const getPlayerDetails = async (playerSlug: string, options?: Parameters<typeof customFetch>[1]): Promise<PlayerDetails> => {
+
+  return customFetch<PlayerDetails>(getGetPlayerDetailsUrl(playerSlug),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPlayerDetailsQueryKey = (playerSlug: string,) => {
+    return [
+    `/api/players/${playerSlug}`
+    ] as const;
+    }
+
+
+export const getGetPlayerDetailsQueryOptions = <TData = Awaited<ReturnType<typeof getPlayerDetails>>, TError = ErrorType<ErrorResponse>>(playerSlug: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPlayerDetails>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPlayerDetailsQueryKey(playerSlug);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPlayerDetails>>> = ({ signal }) => getPlayerDetails(playerSlug, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: playerSlug !== null && playerSlug !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPlayerDetails>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPlayerDetailsQueryResult = NonNullable<Awaited<ReturnType<typeof getPlayerDetails>>>
+export type GetPlayerDetailsQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Get BeSoccer player profile and tab data
+ */
+
+export function useGetPlayerDetails<TData = Awaited<ReturnType<typeof getPlayerDetails>>, TError = ErrorType<ErrorResponse>>(
+ playerSlug: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPlayerDetails>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPlayerDetailsQueryOptions(playerSlug,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

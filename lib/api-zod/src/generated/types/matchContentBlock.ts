@@ -14,4 +14,6 @@ export interface MatchContentBlock {
   imageAlt?: string;
   headers?: string[];
   rows?: string[][];
+  playerSlug?: string;
+  playerSlugs?: ((string | null)[])[];
 }

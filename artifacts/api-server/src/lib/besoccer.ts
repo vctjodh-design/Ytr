@@ -8,6 +8,10 @@ import type {
   MatchOdds,
   MatchStat,
   OddsEntry,
+  PlayerContentPage,
+  PlayerContentPageTab,
+  PlayerDetails,
+  PlayerProfile,
   PreviewFact,
   StandingRow,
   TeamContentPage,
@@ -968,7 +972,7 @@ function parseLineups(
     : 0;
   const starterSection = markdown.slice(startersStart, startersEnd);
   const playerExpression =
-    /^\s*[*-]\s+\[!\[Image \d+:\s*([^\]]+)\]\(([^)]+)\)(.*?)\]\(https?:\/\/www\.besoccer\.com\/player\/[^)]+\)/gm;
+    /^\s*[*-]\s+\[!\[Image \d+:\s*([^\]]+)\]\(([^)]+)\)(.*?)\]\((https?:\/\/www\.besoccer\.com\/player\/[^)]+)\)/gm;
   const starterMatches = Array.from(starterSection.matchAll(playerExpression));
   const formations = Array.from(
     starterSection.matchAll(/\b\d{1,2}-\d{1,2}(?:-\d{1,2}){1,2}\b/g),
@@ -998,6 +1002,7 @@ function parseLineups(
       photoUrl: playerMatch[2] ?? null,
       rating: rating ? Number(rating) : null,
       isSubstitute: false,
+      playerSlug: playerSlugFromSourceUrl(playerMatch[4] ?? ""),
     };
   };
 
@@ -1015,7 +1020,7 @@ function parseLineups(
     groups.forEach((group, groupIndex) => {
       const teamIndex = Math.min(groupIndex, teamNames.length - 1);
       for (const playerLink of group.matchAll(
-        /\]\(https?:\/\/www\.besoccer\.com\/player\/[^)]+\)/g,
+        /\]\((https?:\/\/www\.besoccer\.com\/player\/[^)]+)\)/g,
       )) {
         if (playerLink.index === undefined) continue;
         const rawLabel = anchorLabel(group, playerLink.index);
@@ -1044,6 +1049,7 @@ function parseLineups(
           photoUrl: playerPhoto?.[1] ?? null,
           rating: rating ? Number(rating) : null,
           isSubstitute: true,
+          playerSlug: playerSlugFromSourceUrl(playerLink[1] ?? ""),
         });
       }
     });
@@ -1991,6 +1997,43 @@ const teamModuleTitles: Record<string, string> = {
   mod_honours: "Honours",
   mod_history: "Historical results",
 };
+const ignoredPlayerModules = new Set([
+  "mod_bet_age_confirm",
+  "mod_seoH1",
+  "mod_login_popup",
+  "mod_register_popup",
+  "mod_popupFavourites",
+  "mod_sticky",
+]);
+const playerModuleTitles: Record<string, string> = {
+  mod_player_season: "Current season",
+  mod_actual_transfers: "Recent transfer",
+  mod_player_last_match: "Last match",
+  mod_news_scroll: "Latest news",
+  mod_player_stats: "Player information",
+  mod_last_matches_streak: "Recent matches",
+  mod_player_competitions: "Competitions",
+  mod_player_team_position: "Team position",
+  mod_attributes: "Attributes",
+  mod_player_rating: "Rating history",
+  mod_player_market: "Market value",
+  mod_player_last_transfers: "Transfer history",
+  mod_player_performance: "Career performance",
+  mod_club_trajectory: "Club career",
+  mod_player_teammates: "Teammates",
+  mod_player_performance_club: "Club performance",
+  mod_player_teams: "Club history",
+  mod_player_sel_info: "National team information",
+  mod_national_trajectory: "National team career",
+  mod_player_performance_national: "National team performance",
+  mod_palmares: "Achievements",
+  mod_achievements: "Milestones",
+  mod_best_matches: "Best matches",
+  mod_trajectory: "Career",
+  mod_transfers: "Transfers",
+  mod_teammates: "Teammates",
+  mod_matches: "Matches",
+};
 
 function parseHtmlAttributes(tag: string): Record<string, string> {
   const attrs: Record<string, string> = {};
@@ -2075,10 +2118,42 @@ function imageUrlFromNode(node: TeamHtmlNode): string | null {
   }
 }
 
+function playerSlugFromSourceUrl(sourceUrl: string): string | null {
+  try {
+    const url = new URL(sourceUrl, besoccerOrigin);
+    if (
+      !["besoccer.com", "www.besoccer.com"].includes(url.hostname.toLowerCase())
+    ) {
+      return null;
+    }
+    const segments = url.pathname.split("/").filter(Boolean);
+    if (segments[0] !== "player" || segments.includes("compare")) return null;
+    const slug = segments.at(-1) ?? "";
+    return /^[a-z0-9-]+$/i.test(slug) ? slug : null;
+  } catch {
+    return null;
+  }
+}
+
+function findLinkedPlayerSlug(node: TeamHtmlNode): string | null {
+  if (node.tag === "a") {
+    const slug = playerSlugFromSourceUrl(node.attrs.href ?? "");
+    if (slug) return slug;
+  }
+  for (const child of node.children) {
+    if (typeof child !== "string") {
+      const slug = findLinkedPlayerSlug(child);
+      if (slug) return slug;
+    }
+  }
+  return null;
+}
+
 function collectTeamBlocks(
   node: TeamHtmlNode,
   blocks: TeamContentBlock[],
   excludedHeading = "",
+  playerSlug: string | null = null,
 ): void {
   if (teamNodeHidden(node) || ["script", "style", "svg", "iframe", "noscript"].includes(node.tag)) {
     return;
@@ -2091,7 +2166,31 @@ function collectTeamBlocks(
       imageUrl &&
       !/^(?:logo|team icon|icon|schedule|football pitch)$/i.test(imageAlt)
     ) {
-      blocks.push({ type: "image", imageUrl, imageAlt });
+      blocks.push({
+        type: "image",
+        imageUrl,
+        imageAlt,
+        ...(playerSlug ? { playerSlug } : {}),
+      });
+    }
+    return;
+  }
+
+  if (node.tag === "a") {
+    const linkedPlayer = playerSlugFromSourceUrl(node.attrs.href ?? "") ?? playerSlug;
+    for (const child of node.children) {
+      if (typeof child === "string") {
+        const text = cleanHtmlText(child);
+        if (text && !isPageChrome(text)) {
+          blocks.push({
+            type: "text",
+            text,
+            ...(linkedPlayer ? { playerSlug: linkedPlayer } : {}),
+          });
+        }
+      } else {
+        collectTeamBlocks(child, blocks, excludedHeading, linkedPlayer);
+      }
     }
     return;
   }
@@ -2099,20 +2198,24 @@ function collectTeamBlocks(
   if (node.tag === "table") {
     const rows: string[][] = [];
     const headers: string[] = [];
+    const playerSlugs: Array<Array<string | null>> = [];
     const visitRows = (current: TeamHtmlNode) => {
       for (const child of current.children) {
         if (typeof child === "string" || teamNodeHidden(child)) continue;
         if (child.tag === "tr") {
-          const cells = child.children
+          const cellNodes = child.children
             .filter(
               (cell): cell is TeamHtmlNode =>
                 typeof cell !== "string" && ["th", "td"].includes(cell.tag),
-            )
-            .map(teamNodeText);
+            );
+          const cells = cellNodes.map(teamNodeText);
           if (child.children.some((cell) => typeof cell !== "string" && cell.tag === "th")) {
             headers.push(...cells);
           } else if (cells.some(Boolean)) {
             rows.push(cells);
+            playerSlugs.push(
+              cellNodes.map((cell) => findLinkedPlayerSlug(cell) ?? playerSlug),
+            );
           }
         } else {
           visitRows(child);
@@ -2121,13 +2224,19 @@ function collectTeamBlocks(
     };
     visitRows(node);
     if (headers.length || rows.length) {
-      blocks.push({ type: "table", headers, rows });
+      const hasPlayerLinks = playerSlugs.some((row) => row.some(Boolean));
+      blocks.push({
+        type: "table",
+        headers,
+        rows,
+        ...(hasPlayerLinks ? { playerSlugs } : {}),
+      });
     }
     const collectImages = (current: TeamHtmlNode) => {
       for (const child of current.children) {
         if (typeof child === "string" || teamNodeHidden(child)) continue;
         if (child.tag === "img") {
-          collectTeamBlocks(child, blocks, excludedHeading);
+          collectTeamBlocks(child, blocks, excludedHeading, playerSlug);
         } else {
           collectImages(child);
         }
@@ -2146,11 +2255,11 @@ function collectTeamBlocks(
   if (semanticText) {
     const text = teamNodeText(node);
     if (text && text !== excludedHeading && !isPageChrome(text)) {
-      blocks.push({ type: "text", text });
+      blocks.push({ type: "text", text, ...(playerSlug ? { playerSlug } : {}) });
     }
     const collectImages = (current: TeamHtmlNode) => {
       if (current.tag === "img") {
-        collectTeamBlocks(current, blocks, excludedHeading);
+        collectTeamBlocks(current, blocks, excludedHeading, playerSlug);
         return;
       }
       for (const child of current.children) {
@@ -2166,19 +2275,23 @@ function collectTeamBlocks(
       const text = cleanHtmlText(child);
       if (text && !isPageChrome(text)) blocks.push({ type: "text", text });
     } else {
-      collectTeamBlocks(child, blocks, excludedHeading);
+      collectTeamBlocks(child, blocks, excludedHeading, playerSlug);
     }
   }
 }
 
-function parseTeamHtmlSections(html: string): TeamContentPage["sections"] {
+function parseHtmlModuleSections(
+  html: string,
+  moduleTitles: Record<string, string>,
+  ignoredModules: Set<string>,
+): TeamContentPage["sections"] {
   const tree = parseTeamHtml(html);
   const modules: TeamHtmlNode[] = [];
   const findModules = (node: TeamHtmlNode) => {
     if (
       node.tag === "div" &&
       node.attrs.id?.startsWith("mod_") &&
-      !ignoredTeamModules.has(node.attrs.id)
+      !ignoredModules.has(node.attrs.id)
     ) {
       modules.push(node);
       return;
@@ -2212,7 +2325,7 @@ function parseTeamHtmlSections(html: string): TeamContentPage["sections"] {
         };
         return findHeading(module);
       })();
-      const title = teamModuleTitles[id] ?? heading ?? id.replace(/^mod_/, "");
+      const title = moduleTitles[id] ?? heading ?? id.replace(/^mod_/, "");
       const blocks: TeamContentBlock[] = [];
       collectTeamBlocks(module, blocks, heading ?? "");
       const compactBlocks = blocks.filter((block, index) => {
@@ -2235,6 +2348,223 @@ function parseTeamHtmlSections(html: string): TeamContentPage["sections"] {
       return { title, text, tables, blocks: compactBlocks };
     })
     .filter((section) => section.blocks?.length);
+}
+
+function parseTeamHtmlSections(html: string): TeamContentPage["sections"] {
+  return parseHtmlModuleSections(html, teamModuleTitles, ignoredTeamModules);
+}
+
+const playerPageSources: Array<{
+  tab: PlayerContentPageTab;
+  suffix: string;
+}> = [
+  { tab: "info", suffix: "" },
+  { tab: "matches", suffix: "matches" },
+  { tab: "career", suffix: "career-path" },
+  { tab: "achievements", suffix: "palmares" },
+  { tab: "milestones", suffix: "achievements" },
+  { tab: "attributes", suffix: "attributes" },
+  { tab: "transfers", suffix: "transfers" },
+  { tab: "teammates", suffix: "team-mates" },
+];
+
+function playerProfilePath(slug: string, suffix: string): string {
+  return suffix ? `/player/${suffix}/${slug}` : `/player/${slug}`;
+}
+
+function parsePlayerProfile(html: string, slug: string): PlayerProfile {
+  const tree = parseTeamHtml(html);
+  const nodes: TeamHtmlNode[] = [];
+  const collectNodes = (node: TeamHtmlNode) => {
+    nodes.push(node);
+    for (const child of node.children) {
+      if (typeof child !== "string") collectNodes(child);
+    }
+  };
+  collectNodes(tree);
+
+  let person: Record<string, unknown> = {};
+  const personJson = html.match(
+    /<script\b(?=[^>]*type=["']application\/ld\+json["'])[^>]*>([\s\S]*?)<\/script>/i,
+  )?.[1];
+  if (personJson) {
+    try {
+      const parsed = asRecord(JSON.parse(personJson));
+      if (parsed) person = parsed;
+    } catch {
+      person = {};
+    }
+  }
+
+  const header = nodes.find((node) => teamNodeHasClass(node, "player-head")) ?? tree;
+  const headerNodes: TeamHtmlNode[] = [];
+  const collectHeaderNodes = (node: TeamHtmlNode) => {
+    headerNodes.push(node);
+    for (const child of node.children) {
+      if (typeof child !== "string") collectHeaderNodes(child);
+    }
+  };
+  collectHeaderNodes(header);
+
+  const name =
+    textValue(person.name) ??
+    teamNodeText(
+      headerNodes.find((node) => teamNodeHasClass(node, "title")) ?? header,
+    ) ??
+    slug;
+  const photoNode = headerNodes.find(
+    (node) => node.tag === "img" && /\/img_data\/players\//i.test(node.attrs.src ?? ""),
+  );
+  const flagNode = headerNodes.find(
+    (node) =>
+      node.tag === "img" &&
+      (teamNodeHasClass(node, "flag") || /\/flags\/round\//i.test(node.attrs.src ?? "")),
+  );
+  const teamInfo = headerNodes.find((node) => teamNodeHasClass(node, "team-info"));
+  const teamInfoNodes: TeamHtmlNode[] = [];
+  if (teamInfo) {
+    const collectTeamInfo = (node: TeamHtmlNode) => {
+      teamInfoNodes.push(node);
+      for (const child of node.children) {
+        if (typeof child !== "string") collectTeamInfo(child);
+      }
+    };
+    collectTeamInfo(teamInfo);
+  }
+  const teamAnchor = teamInfoNodes.find(
+    (node) => node.tag === "a" && /\/team\/[a-z0-9-]+/i.test(node.attrs.href ?? ""),
+  );
+  const teamBadgeNode = teamInfoNodes.find(
+    (node) =>
+      node.tag === "img" && /\/img_data\/equipos\//i.test(node.attrs.src ?? ""),
+  );
+  const currentTeam =
+    textValue(asRecord(person.memberOf)?.name) ??
+    teamNodeText(teamInfo ?? { tag: "div", attrs: {}, children: [] })
+      .replace(/\b(Ligue 1|Premier League|LaLiga|Serie A|Bundesliga|Ligue 2)\b.*$/i, "")
+      .trim() ??
+    null;
+  const dataBoxes = headerNodes.filter((node) => teamNodeHasClass(node, "data-box"));
+  const nodeWithin = (root: TeamHtmlNode, predicate: (node: TeamHtmlNode) => boolean) => {
+    const matches: TeamHtmlNode[] = [];
+    const visit = (node: TeamHtmlNode) => {
+      if (predicate(node)) matches.push(node);
+      for (const child of node.children) {
+        if (typeof child !== "string") visit(child);
+      }
+    };
+    visit(root);
+    return matches;
+  };
+  const ageBox = dataBoxes.find((box) =>
+    nodeWithin(box, (node) => teamNodeHasClass(node, "info")).some(
+      (node) => /years?/i.test(teamNodeText(node)),
+    ),
+  );
+  const ageValue = ageBox
+    ? nodeWithin(ageBox, (node) => teamNodeHasClass(node, "number"))
+        .map((node) => Number.parseInt(teamNodeText(node), 10))
+        .find(Number.isFinite)
+    : undefined;
+  const marketBox = dataBoxes.find((box) => /(?:M\.€|[€£$])/i.test(teamNodeText(box)));
+  const marketNumber = marketBox
+    ? nodeWithin(marketBox, (node) => teamNodeHasClass(node, "number"))[0]
+    : undefined;
+  const marketUnit = marketBox
+    ? nodeWithin(marketBox, (node) => teamNodeHasClass(node, "info"))[0]
+    : undefined;
+  const shirtNode = headerNodes.find(
+    (node) => node.attrs.class?.split(/\s+/).some((className) => className === "black"),
+  );
+  const positionNode = headerNodes.find(
+    (node) =>
+      teamNodeHasClass(node, "bg-role") &&
+      !node.attrs.class?.split(/\s+/).includes("black"),
+  );
+  const ratingNode = headerNodes.find(
+    (node) => teamNodeHasClass(node, "elo") && /^\d+$/.test(teamNodeText(node)),
+  );
+  const birthDate = textValue(person.birthDate);
+  const ageFromBirthDate = birthDate
+    ? (() => {
+        const [year, month, day] = birthDate.split("-").map(Number);
+        if (!year || !month || !day) return null;
+        const now = new Date();
+        return now.getUTCFullYear() - year -
+          (now.getUTCMonth() + 1 < month ||
+          (now.getUTCMonth() + 1 === month && now.getUTCDate() < day)
+            ? 1
+            : 0);
+      })()
+    : null;
+
+  return {
+    slug,
+    name,
+    photoUrl:
+      imageUrlFromNode(photoNode ?? { tag: "img", attrs: {}, children: [] }) ??
+      imageUrlFromNode({
+        tag: "img",
+        attrs: { src: textValue(person.image) ?? "" },
+        children: [],
+      }),
+    nationality: textValue(asRecord(person.nationality)?.name),
+    nationalityFlagUrl: imageUrlFromNode(flagNode ?? { tag: "img", attrs: {}, children: [] }),
+    birthDate,
+    age: ageValue ?? ageFromBirthDate,
+    heightCm: parseNumber(textValue(asRecord(person.height)?.value) ?? undefined),
+    weightKg: parseNumber(textValue(asRecord(person.weight)?.value) ?? undefined),
+    currentTeam,
+    teamSlug: teamAnchor
+      ? teamAnchor.attrs.href?.match(/\/team\/([a-z0-9-]+)/i)?.[1] ?? null
+      : null,
+    teamBadgeUrl: imageUrlFromNode(teamBadgeNode ?? { tag: "img", attrs: {}, children: [] }),
+    position:
+      teamNodeText(positionNode ?? { tag: "div", attrs: {}, children: [] }) ||
+      textValue(person.jobTitle),
+    shirtNumber: shirtNode ? parseNumber(teamNodeText(shirtNode)) : null,
+    rating: ratingNode ? parseNumber(teamNodeText(ratingNode)) : null,
+    marketValue: marketNumber
+      ? `${teamNodeText(marketNumber)} ${teamNodeText(
+          marketUnit ?? { tag: "div", attrs: {}, children: [] },
+        )}`.trim()
+      : null,
+    sourceUrl: `${besoccerOrigin}${playerProfilePath(slug, "")}`,
+  };
+}
+
+export async function getPlayerDetails(playerSlug: string): Promise<PlayerDetails> {
+  const cached = fromCache<PlayerDetails>(`player:${playerSlug}`);
+  if (cached) return cached;
+
+  const results = await Promise.allSettled(
+    playerPageSources.map(({ suffix }) =>
+      getRawHtml(playerProfilePath(playerSlug, suffix)),
+    ),
+  );
+  const infoResult = results[0];
+  if (!infoResult || infoResult.status === "rejected") {
+    throw infoResult?.reason ?? new Error("Player profile is not available");
+  }
+
+  const pages: PlayerContentPage[] = playerPageSources.map((source, index) => {
+    const result = results[index];
+    return {
+      tab: source.tab,
+      sourceUrl: `${besoccerOrigin}${playerProfilePath(playerSlug, source.suffix)}`,
+      sections:
+        result?.status === "fulfilled"
+          ? parseHtmlModuleSections(
+              result.value,
+              playerModuleTitles,
+              ignoredPlayerModules,
+            )
+          : [],
+    };
+  });
+  const result = { player: parsePlayerProfile(infoResult.value, playerSlug), pages };
+  saveCache(`player:${playerSlug}`, result, 120_000);
+  return result;
 }
 
 export async function getTeamDetails(teamSlug: string): Promise<TeamDetails> {

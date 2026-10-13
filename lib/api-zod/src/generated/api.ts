@@ -159,7 +159,8 @@ export const GetMatchDetailsResponse = zod.object({
   "position": zod.string().nullable(),
   "photoUrl": zod.string().url().nullable(),
   "rating": zod.number().nullable(),
-  "isSubstitute": zod.boolean()
+  "isSubstitute": zod.boolean(),
+  "playerSlug": zod.string().nullable()
 }))
 })),
   "events": zod.array(zod.object({
@@ -192,7 +193,9 @@ export const GetMatchDetailsResponse = zod.object({
   "imageUrl": zod.string().url().optional(),
   "imageAlt": zod.string().optional(),
   "headers": zod.array(zod.string()).optional(),
-  "rows": zod.array(zod.array(zod.string())).optional()
+  "rows": zod.array(zod.array(zod.string())).optional(),
+  "playerSlug": zod.string().optional(),
+  "playerSlugs": zod.array(zod.array(zod.string().nullable())).optional()
 })).optional()
 }))
 }))
@@ -276,7 +279,64 @@ export const GetTeamDetailsResponse = zod.object({
   "imageUrl": zod.string().url().optional(),
   "imageAlt": zod.string().optional(),
   "headers": zod.array(zod.string()).optional(),
-  "rows": zod.array(zod.array(zod.string())).optional()
+  "rows": zod.array(zod.array(zod.string())).optional(),
+  "playerSlug": zod.string().optional(),
+  "playerSlugs": zod.array(zod.array(zod.string().nullable())).optional()
+})).optional()
+}))
+}))
+})
+
+
+/**
+ * @summary Get BeSoccer player profile and tab data
+ */
+export const getPlayerDetailsPathPlayerSlugRegExp = new RegExp('^[a-z0-9-]+$');
+
+
+export const GetPlayerDetailsParams = zod.object({
+  "playerSlug": zod.coerce.string().regex(getPlayerDetailsPathPlayerSlugRegExp)
+})
+
+export const GetPlayerDetailsResponse = zod.object({
+  "player": zod.object({
+  "slug": zod.string(),
+  "name": zod.string(),
+  "photoUrl": zod.string().url().nullable(),
+  "nationality": zod.string().nullable(),
+  "nationalityFlagUrl": zod.string().url().nullable(),
+  "birthDate": zod.coerce.date().nullable(),
+  "age": zod.number().int().nullable(),
+  "heightCm": zod.number().int().nullable(),
+  "weightKg": zod.number().int().nullable(),
+  "currentTeam": zod.string().nullable(),
+  "teamSlug": zod.string().nullable(),
+  "teamBadgeUrl": zod.string().url().nullable(),
+  "position": zod.string().nullable(),
+  "shirtNumber": zod.number().int().nullable(),
+  "rating": zod.number().int().nullable(),
+  "marketValue": zod.string().nullable(),
+  "sourceUrl": zod.string().url()
+}),
+  "pages": zod.array(zod.object({
+  "tab": zod.enum(['info', 'matches', 'career', 'achievements', 'milestones', 'attributes', 'transfers', 'teammates']),
+  "sourceUrl": zod.string().url(),
+  "sections": zod.array(zod.object({
+  "title": zod.string(),
+  "text": zod.array(zod.string()),
+  "tables": zod.array(zod.object({
+  "headers": zod.array(zod.string()),
+  "rows": zod.array(zod.array(zod.string()))
+})),
+  "blocks": zod.array(zod.object({
+  "type": zod.enum(['text', 'image', 'table']),
+  "text": zod.string().optional(),
+  "imageUrl": zod.string().url().optional(),
+  "imageAlt": zod.string().optional(),
+  "headers": zod.array(zod.string()).optional(),
+  "rows": zod.array(zod.array(zod.string())).optional(),
+  "playerSlug": zod.string().optional(),
+  "playerSlugs": zod.array(zod.array(zod.string().nullable())).optional()
 })).optional()
 }))
 }))

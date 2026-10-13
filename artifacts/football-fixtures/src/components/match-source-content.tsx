@@ -1,7 +1,8 @@
 import { ExternalLink, FileText } from 'lucide-react';
-import type { MatchDetails } from '@workspace/api-client-react';
+import { Link } from 'wouter';
+import type { MatchContentPage } from '@workspace/api-client-react';
 
-type SourcePage = MatchDetails['sourcePages'][number];
+type SourcePage = MatchContentPage;
 
 function safeSourceUrl(value: string): string | null {
   try {
@@ -49,12 +50,21 @@ export function MatchSourceContent({ page, tab }: { page?: SourcePage; tab: stri
                 <div className="source-content-blocks">
                   {section.blocks.map((block, blockIndex) => {
                     if (block.type === 'image' && block.imageUrl) {
-                      return (
+                      const figure = (
                         <figure className="source-image-block" key={`image-${blockIndex}`}>
                           <img src={block.imageUrl} alt={block.imageAlt || ''} loading="lazy" />
                           {block.imageAlt && <figcaption>{block.imageAlt}</figcaption>}
                         </figure>
                       );
+                      return block.playerSlug ? (
+                        <Link
+                          className="source-player-image-link"
+                          href={`/player/${encodeURIComponent(block.playerSlug)}`}
+                          key={`image-${blockIndex}`}
+                        >
+                          {figure}
+                        </Link>
+                      ) : figure;
                     }
                     if (block.type === 'table') {
                       return (
@@ -66,7 +76,18 @@ export function MatchSourceContent({ page, tab }: { page?: SourcePage; tab: stri
                             <tbody>
                               {block.rows?.map((row, rowIndex) => (
                                 <tr key={`row-${rowIndex}`}>
-                                  {row.map((value, cellIndex) => <td key={`${cellIndex}-${value}`}>{value}</td>)}
+                                  {row.map((value, cellIndex) => {
+                                    const playerSlug = block.playerSlugs?.[rowIndex]?.[cellIndex];
+                                    return (
+                                      <td key={`${cellIndex}-${value}`}>
+                                        {playerSlug ? (
+                                          <Link href={`/player/${encodeURIComponent(playerSlug)}`} className="source-player-link">
+                                            {value}
+                                          </Link>
+                                        ) : value}
+                                      </td>
+                                    );
+                                  })}
                                 </tr>
                               ))}
                             </tbody>
@@ -75,7 +96,13 @@ export function MatchSourceContent({ page, tab }: { page?: SourcePage; tab: stri
                       );
                     }
                     return block.text ? (
-                      <p className="source-text-entry" key={`text-${blockIndex}`}>{block.text}</p>
+                      <p className="source-text-entry" key={`text-${blockIndex}`}>
+                        {block.playerSlug ? (
+                          <Link href={`/player/${encodeURIComponent(block.playerSlug)}`} className="source-player-link">
+                            {block.text}
+                          </Link>
+                        ) : block.text}
+                      </p>
                     ) : null;
                   })}
                 </div>

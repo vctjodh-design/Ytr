@@ -89,6 +89,8 @@ export interface LineupPlayer {
   /** @nullable */
   rating: number | null;
   isSubstitute: boolean;
+  /** @nullable */
+  playerSlug: string | null;
 }
 
 export interface TeamLineup {
@@ -182,6 +184,8 @@ export interface MatchContentBlock {
   imageAlt?: string;
   headers?: string[];
   rows?: string[][];
+  playerSlug?: string;
+  playerSlugs?: ((string | null)[])[];
 }
 
 export interface MatchContentSection {
@@ -253,6 +257,65 @@ export interface TeamContentPage {
 export interface TeamDetails {
   team: TeamProfile;
   pages: TeamContentPage[];
+}
+
+export interface PlayerProfile {
+  slug: string;
+  name: string;
+  /** @nullable */
+  photoUrl: string | null;
+  /** @nullable */
+  nationality: string | null;
+  /** @nullable */
+  nationalityFlagUrl: string | null;
+  /** @nullable */
+  birthDate: string | null;
+  /** @nullable */
+  age: number | null;
+  /** @nullable */
+  heightCm: number | null;
+  /** @nullable */
+  weightKg: number | null;
+  /** @nullable */
+  currentTeam: string | null;
+  /** @nullable */
+  teamSlug: string | null;
+  /** @nullable */
+  teamBadgeUrl: string | null;
+  /** @nullable */
+  position: string | null;
+  /** @nullable */
+  shirtNumber: number | null;
+  /** @nullable */
+  rating: number | null;
+  /** @nullable */
+  marketValue: string | null;
+  sourceUrl: string;
+}
+
+export type PlayerContentPageTab = typeof PlayerContentPageTab[keyof typeof PlayerContentPageTab];
+
+
+export const PlayerContentPageTab = {
+  info: 'info',
+  matches: 'matches',
+  career: 'career',
+  achievements: 'achievements',
+  milestones: 'milestones',
+  attributes: 'attributes',
+  transfers: 'transfers',
+  teammates: 'teammates',
+} as const;
+
+export interface PlayerContentPage {
+  tab: PlayerContentPageTab;
+  sourceUrl: string;
+  sections: MatchContentSection[];
+}
+
+export interface PlayerDetails {
+  player: PlayerProfile;
+  pages: PlayerContentPage[];
 }
 
 export type ListFixturesParams = {

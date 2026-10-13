@@ -203,6 +203,42 @@ function Rating({ rating }: { rating: number | null }) {
   );
 }
 
+function PlayerPhoto({ player }: { player: MatchDetails['lineups'][number]['players'][number] }) {
+  const photo = player.photoUrl ? (
+    <img className="player-photo" src={player.photoUrl} alt="" loading="lazy" />
+  ) : (
+    <span className="player-photo-fallback" aria-hidden="true">{player.name.slice(0, 1)}</span>
+  );
+  return player.playerSlug ? (
+    <Link
+      className="lineup-player-photo-link"
+      href={`/player/${encodeURIComponent(player.playerSlug)}`}
+      aria-label={`Open ${player.name} player profile`}
+    >
+      {photo}
+    </Link>
+  ) : photo;
+}
+
+function PlayerName({ player }: { player: MatchDetails['lineups'][number]['players'][number] }) {
+  const name = (
+    <>
+      <strong>{player.name}</strong>
+      {player.position && <small>{player.position}</small>}
+    </>
+  );
+  return player.playerSlug ? (
+    <Link
+      className="player-name lineup-player-name-link"
+      href={`/player/${encodeURIComponent(player.playerSlug)}`}
+    >
+      {name}
+    </Link>
+  ) : (
+    <span className="player-name">{name}</span>
+  );
+}
+
 function LineupsContent({ details }: { details: MatchDetails }) {
   const lineups = details.lineups ?? [];
   if (!lineups.length) {
@@ -241,15 +277,8 @@ function LineupsContent({ details }: { details: MatchDetails }) {
                       {starters.map((player, index) => (
                         <div className="player-row" key={`${player.name}-${index}`}>
                           <span className="player-number">{player.number ?? '—'}</span>
-                          {player.photoUrl ? (
-                            <img className="player-photo" src={player.photoUrl} alt="" loading="lazy" />
-                          ) : (
-                            <span className="player-photo-fallback" aria-hidden="true">{player.name.slice(0, 1)}</span>
-                          )}
-                          <span className="player-name">
-                            <strong>{player.name}</strong>
-                            {player.position && <small>{player.position}</small>}
-                          </span>
+                          <PlayerPhoto player={player} />
+                          <PlayerName player={player} />
                           <Rating rating={player.rating} />
                         </div>
                       ))}
@@ -263,15 +292,8 @@ function LineupsContent({ details }: { details: MatchDetails }) {
                       {substitutes.map((player, index) => (
                         <div className="player-row is-substitute" key={`${player.name}-${index}`}>
                           <span className="player-number">{player.number ?? '—'}</span>
-                          {player.photoUrl ? (
-                            <img className="player-photo" src={player.photoUrl} alt="" loading="lazy" />
-                          ) : (
-                            <span className="player-photo-fallback" aria-hidden="true">{player.name.slice(0, 1)}</span>
-                          )}
-                          <span className="player-name">
-                            <strong>{player.name}</strong>
-                            {player.position && <small>{player.position}</small>}
-                          </span>
+                          <PlayerPhoto player={player} />
+                          <PlayerName player={player} />
                           <Rating rating={player.rating} />
                         </div>
                       ))}

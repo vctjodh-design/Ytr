@@ -17,4 +17,6 @@ export interface LineupPlayer {
   /** @nullable */
   rating: number | null;
   isSubstitute: boolean;
+  /** @nullable */
+  playerSlug: string | null;
 }

@@ -14,6 +14,8 @@ tags:
     description: BeSoccer fixture and match data
   - name: teams
     description: BeSoccer team profile data
+  - name: players
+    description: BeSoccer player profile data
 paths:
   /healthz:
     get:
@@ -160,6 +162,37 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "502":
           description: BeSoccer team data could not be retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /players/{playerSlug}:
+    get:
+      operationId: getPlayerDetails
+      tags: [players]
+      summary: Get BeSoccer player profile and tab data
+      parameters:
+        - name: playerSlug
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[a-z0-9-]+$"
+      responses:
+        "200":
+          description: Player profile with info, matches, career, achievements, milestones, attributes, transfers, and teammates
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayerDetails"
+        "404":
+          description: Player not found or unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: BeSoccer player data could not be retrieved
           content:
             application/json:
               schema:
@@ -318,7 +351,9 @@ components:
           type: ["number", "null"]
         isSubstitute:
           type: boolean
-      required: [name, number, position, photoUrl, rating, isSubstitute]
+        playerSlug:
+          type: ["string", "null"]
+      required: [name, number, position, photoUrl, rating, isSubstitute, playerSlug]
     TeamLineup:
       type: object
       properties:
@@ -483,6 +518,14 @@ components:
             type: array
             items:
               type: string
+        playerSlug:
+          type: string
+        playerSlugs:
+          type: array
+          items:
+            type: array
+            items:
+              type: ["string", "null"]
       required: [type]
     MatchContentPage:
       type: object
@@ -612,4 +655,87 @@ components:
           items:
             $ref: "#/components/schemas/MatchContentSection"
       required: [tab, sourceUrl, sections]
+    PlayerProfile:
+      type: object
+      properties:
+        slug:
+          type: string
+        name:
+          type: string
+        photoUrl:
+          type: ["string", "null"]
+          format: uri
+        nationality:
+          type: ["string", "null"]
+        nationalityFlagUrl:
+          type: ["string", "null"]
+          format: uri
+        birthDate:
+          type: ["string", "null"]
+        age:
+          type: ["integer", "null"]
+        heightCm:
+          type: ["integer", "null"]
+        weightKg:
+          type: ["integer", "null"]
+        currentTeam:
+          type: ["string", "null"]
+        teamSlug:
+          type: ["string", "null"]
+        teamBadgeUrl:
+          type: ["string", "null"]
+          format: uri
+        position:
+          type: ["string", "null"]
+        shirtNumber:
+          type: ["integer", "null"]
+        rating:
+          type: ["integer", "null"]
+        marketValue:
+          type: ["string", "null"]
+        sourceUrl:
+          type: string
+          format: uri
+      required:
+        - slug
+        - name
+        - photoUrl
+        - nationality
+        - nationalityFlagUrl
+        - birthDate
+        - age
+        - heightCm
+        - weightKg
+        - currentTeam
+        - teamSlug
+        - teamBadgeUrl
+        - position
+        - shirtNumber
+        - rating
+        - marketValue
+        - sourceUrl
+    PlayerContentPage:
+      type: object
+      properties:
+        tab:
+          type: string
+          enum: [info, matches, career, achievements, milestones, attributes, transfers, teammates]
+        sourceUrl:
+          type: string
+          format: uri
+        sections:
+          type: array
+          items:
+            $ref: "#/components/schemas/MatchContentSection"
+      required: [tab, sourceUrl, sections]
+    PlayerDetails:
+      type: object
+      properties:
+        player:
+          $ref: "#/components/schemas/PlayerProfile"
+        pages:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlayerContentPage"
+      required: [player, pages]
 
