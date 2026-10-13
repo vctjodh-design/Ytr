@@ -20,7 +20,10 @@ export interface MatchDetails {
   fetchedAt: Date;
   roundMatches: Fixture[];
   standings: StandingRow[];
+  homeStandings: StandingRow[];
+  awayStandings: StandingRow[];
   analysisStats: MatchStat[];
+  matchStatistics: MatchStat[];
   previewFacts: PreviewFact[];
   lineups: TeamLineup[];
   events: MatchEvent[];

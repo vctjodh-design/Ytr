@@ -703,6 +703,77 @@ function parseStandings(markdown: string): StandingRow[] {
   return rows;
 }
 
+function parseStandingRowsFromHtml(
+  html: string,
+  tabId: "tab_total0" | "tab_local0" | "tab_visitor0",
+): StandingRow[] {
+  const startMatch = html.match(
+    new RegExp(`<div\\b(?=[^>]*\\bid=["']${tabId}["'])[^>]*>`, "i"),
+  );
+  if (!startMatch || startMatch.index === undefined) return [];
+
+  const nextTab = html
+    .slice(startMatch.index + startMatch[0].length)
+    .match(/<div\b(?=[^>]*\bid=["']tab_[^"']+["'])[^>]*>/i);
+  const end = nextTab?.index === undefined
+    ? html.length
+    : startMatch.index + startMatch[0].length + nextTab.index;
+  const section = html.slice(startMatch.index, end);
+  const rows: StandingRow[] = [];
+
+  for (const rowMatch of section.matchAll(/<tr\b[^>]*class=["'][^"']*row-body[^"']*["'][^>]*>([\s\S]*?)<\/tr>/gi)) {
+    const row = rowMatch[1] ?? "";
+    const cells = Array.from(
+      row.matchAll(/<(td|th)\b[^>]*>([\s\S]*?)<\/\1>/gi),
+      (cell) => cell[2] ?? "",
+    );
+    if (cells.length < 11) continue;
+
+    const position = parseNumber(cleanHtmlText(cells[0] ?? ""));
+    const teamName = cells[2]?.match(
+      /<span\b[^>]*class=["'][^"']*team-name[^"']*["'][^>]*>([\s\S]*?)<\/span>/i,
+    )?.[1];
+    const team = cleanHtmlText(
+      teamName ??
+        cells[2]?.match(/<a\b[^>]*>([\s\S]*?)<\/a>/i)?.[1] ??
+        "",
+    );
+    if (position === null || !team) continue;
+
+    const form = Array.from(
+      (cells[2] ?? "").matchAll(
+        /<span\b[^>]*class=["'][^"']*bg-match-res\s+(win|draw|lose)[^"']*["'][^>]*>/gi,
+      ),
+      (result) =>
+        result[1]?.toLowerCase() === "win"
+          ? "W"
+          : result[1]?.toLowerCase() === "draw"
+            ? "D"
+            : "L",
+    ).join("");
+
+    rows.push({
+      position,
+      team,
+      badgeUrl: cells[1]?.match(/<img\b[^>]*>/i)?.[0]
+        ? htmlAttribute(cells[1]?.match(/<img\b[^>]*>/i)?.[0] ?? "", "src")
+        : null,
+      form: form || null,
+      points: parseNumber(cleanHtmlText(cells[3] ?? "")),
+      matchesPlayed: parseNumber(cleanHtmlText(cells[4] ?? "")),
+      wins: parseNumber(cleanHtmlText(cells[5] ?? "")),
+      draws: parseNumber(cleanHtmlText(cells[6] ?? "")),
+      losses: parseNumber(cleanHtmlText(cells[7] ?? "")),
+      goalsFor: parseNumber(cleanHtmlText(cells[8] ?? "")),
+      goalsAgainst: parseNumber(cleanHtmlText(cells[9] ?? "")),
+      goalDifference: parseNumber(cleanHtmlText(cells[10] ?? "")),
+    });
+    if (rows.length >= 20) break;
+  }
+
+  return rows;
+}
+
 function parseAnalysis(markdown: string): MatchStat[] {
   const stats: MatchStat[] = [];
   const text = cleanMarkdown(markdown);
@@ -748,7 +819,50 @@ function parseAnalysis(markdown: string): MatchStat[] {
   return stats;
 }
 
-function parsePreview(markdown: string): PreviewFact[] {
+function parseMatchStatistics(markdown: string): MatchStat[] {
+  const firstPeriod = markdown.match(
+    /\*\*General stats\*\*([\s\S]*?)(?=\*\*General stats\*\*|$)/i,
+  )?.[1];
+  if (!firstPeriod) return [];
+
+  const text = cleanMarkdown(firstPeriod);
+  const pairPatterns: Array<{ label: string; expression: RegExp }> = [
+    {
+      label: "Possession",
+      expression: /Ball possession\s+([\d.]+%)\s+([\d.]+%)/i,
+    },
+    { label: "Offsides", expression: /(\d+)\s+Offsides\s+(\d+)/i },
+    { label: "Corners", expression: /(\d+)\s+Corner kicks\s+(\d+)/i },
+    { label: "Total shots", expression: /(\d+)\s+Total shots\s+(\d+)/i },
+    { label: "Shots blocked", expression: /(\d+)\s+Shots blocked\s+(\d+)/i },
+    {
+      label: "Goalkeeper saves",
+      expression: /(\d+)\s+Goalkeeper saves\s+(\d+)/i,
+    },
+    { label: "Tackles", expression: /(\d+)\s+Tackles\s+(\d+)/i },
+    { label: "Passes", expression: /(\d+)\s+Passes\s+(\d+)/i },
+    {
+      label: "Completed passes",
+      expression: /(\d+\s*\(\d+%\))\s+Completed passes\s+(\d+\s*\(\d+%\))/i,
+    },
+    { label: "Fouls", expression: /(\d+)\s+Fouls\s+(\d+)/i },
+    { label: "Yellow cards", expression: /(\d+)\s+Yellow cards\s+(\d+)/i },
+    { label: "Red cards", expression: /(\d+)\s+Red cards\s+(\d+)/i },
+  ];
+
+  return pairPatterns.flatMap(({ label, expression }) => {
+    const match = text.match(expression);
+    return match
+      ? [{ label, homeValue: match[1] ?? "—", awayValue: match[2] ?? "—" }]
+      : [];
+  });
+}
+
+function parsePreview(
+  markdown: string,
+  homeTeam: string,
+  awayTeam: string,
+): PreviewFact[] {
   const facts: PreviewFact[] = [];
   const text = cleanMarkdown(markdown);
   const comparisonLabels = ["Wins", "Draws", "Losses"];
@@ -784,6 +898,41 @@ function parsePreview(markdown: string): PreviewFact[] {
       facts.push({ label: "Match information", value: linkedValues.join(" · ") });
     }
   }
+
+  const recentForm = markdown.match(
+    /## Recent form([\s\S]*?)(?=## H2H last matches|$)/i,
+  )?.[1];
+  const formResults = Array.from(
+    recentForm?.matchAll(/^\s*([WDL])\s*$/gm) ?? [],
+    (match) => match[1],
+  );
+  if (formResults.length >= 10) {
+    facts.push({
+      label: `${homeTeam} recent form`,
+      value: formResults.slice(0, 5).join(" · "),
+    });
+    facts.push({
+      label: `${awayTeam} recent form`,
+      value: formResults.slice(5, 10).join(" · "),
+    });
+  }
+
+  const headToHead = markdown.match(
+    /## H2H last matches([\s\S]*?)(?=## Last eleven|$)/i,
+  )?.[1];
+  const headToHeadScores = Array.from(
+    headToHead?.matchAll(
+      /\[(\d{1,2}\s*-\s*\d{1,2})\]\(https?:\/\/www\.besoccer\.com\/match\/[^)]+\)/gi,
+    ) ?? [],
+    (match) => (match[1] ?? "").replace(/\s+/g, " "),
+  );
+  if (headToHeadScores.length) {
+    facts.push({
+      label: "Recent head-to-head scores",
+      value: headToHeadScores.join(" · "),
+    });
+  }
+
   return facts;
 }
 
@@ -793,64 +942,77 @@ function parseLineups(
   awayTeam: string,
 ): TeamLineup[] {
   const teamNames = [homeTeam, awayTeam];
-  const headings = Array.from(markdown.matchAll(/^\*\*(.+?)\*\*\s*$/gm));
-  const lineups: TeamLineup[] = [];
+  const substitutesAt = markdown.search(/^## Substitutes\b/im);
+  const startersEnd = substitutesAt >= 0 ? substitutesAt : markdown.length;
+  const homeHeadingMatch = Array.from(
+    markdown.slice(0, startersEnd).matchAll(/^\*\*(.+?)\*\*\s*$/gm),
+  ).find(
+    (match) =>
+      cleanMarkdown(match[1] ?? "").toLowerCase() === homeTeam.toLowerCase(),
+  );
+  const startersStart = homeHeadingMatch
+    ? (homeHeadingMatch.index ?? 0) + homeHeadingMatch[0].length
+    : 0;
+  const starterSection = markdown.slice(startersStart, startersEnd);
+  const playerExpression =
+    /^\s*[*-]\s+\[!\[Image \d+:\s*([^\]]+)\]\(([^)]+)\)(.*?)\]\(https?:\/\/www\.besoccer\.com\/player\/[^)]+\)/gm;
+  const starterMatches = Array.from(starterSection.matchAll(playerExpression));
+  const formations = Array.from(
+    starterSection.matchAll(/\b\d{1,2}-\d{1,2}(?:-\d{1,2}){1,2}\b/g),
+    (match) => match[0],
+  );
+  const coachNames = Array.from(
+    markdown.matchAll(
+      /\[\*\*([^\]]+)\*\*\]\(https?:\/\/www\.besoccer\.com\/coach\/[^)]+\)/gi,
+    ),
+    (match) => cleanMarkdown(match[1] ?? ""),
+  );
 
-  for (const team of teamNames) {
-    const heading = headings.find(
-      (match) => cleanMarkdown(match[1] ?? "").toLowerCase() === team.toLowerCase(),
-    );
-    if (!heading || heading.index === undefined) continue;
-    const start = heading.index + heading[0].length;
-    const nextTeamHeading = headings.find(
-      (match) =>
-        match.index !== undefined &&
-        match.index > start &&
-        teamNames.some(
-          (name) =>
-            cleanMarkdown(match[1] ?? "").toLowerCase() === name.toLowerCase(),
-        ),
-    );
-    const end = nextTeamHeading?.index ?? markdown.length;
-    const section = markdown.slice(start, end);
-    const formation = section.match(/\b\d{1,2}-\d{1,2}(?:-\d{1,2}){1,2}\b/)?.[0] ?? null;
-    const coach = markdown
-      .slice(Math.max(0, heading.index - 500), heading.index)
-      .match(/\[\*\*([^\]]+)\*\*\]\(https?:\/\/www\.besoccer\.com\/coach\/[^)]+\)/)?.[1] ?? null;
-    const substitutesAt = section.search(/## Substitutes/i);
-    const players: LineupPlayer[] = [];
-    const playerExpression =
-      /^\s*[*-]\s+\[!\[Image \d+:\s*([^\]]+)\]\(([^)]+)\)(.*?)\]\(https?:\/\/www\.besoccer\.com\/player\/[^)]+\)/gm;
+  const parseStarter = (playerMatch: RegExpMatchArray): LineupPlayer | null => {
+    const description = cleanMarkdown(playerMatch[3] ?? "");
+    const numberMatch = description.match(/(?:^|\s)c?\s*(\d{1,2})\s+/);
+    const name = description
+      .replace(/^\s*c?\s*\d{1,2}\s+/, "")
+      .replace(/\s+\d{1,3}['’].*$/, "")
+      .replace(/\s+\d+(?:\.\d+)?\s*$/, "")
+      .trim();
+    if (!name) return null;
+    const rating = description.match(/(?:^|\s)(\d{1,2}\.\d)(?=\s|$)/)?.[1];
+    return {
+      name,
+      number: parseNumber(numberMatch?.[1]),
+      position: null,
+      photoUrl: playerMatch[2] ?? null,
+      rating: rating ? Number(rating) : null,
+      isSubstitute: false,
+    };
+  };
 
-    for (const playerMatch of section.matchAll(playerExpression)) {
-      if (playerMatch.index === undefined) continue;
-      const description = cleanMarkdown(playerMatch[3] ?? "");
-      const numberMatch = description.match(/(?:^|\s)c?\s*(\d{1,2})\s+/);
-      const name = description
-        .replace(/^\s*c?\s*\d{1,2}\s+/, "")
-        .replace(/\s+\d+(?:\.\d+)?\s*$/, "")
-        .replace(/\s+\d{1,3}['’].*$/, "")
-        .trim();
-      if (!name) continue;
-      players.push({
-        name,
-        number: parseNumber(numberMatch?.[1]),
-        position: null,
-        photoUrl: playerMatch[2] ?? null,
-        isSubstitute: substitutesAt >= 0 && playerMatch.index > substitutesAt,
-      });
-    }
+  const substitutesByTeam: LineupPlayer[][] = teamNames.map(() => []);
+  if (substitutesAt >= 0) {
+    const substitutesSection =
+      markdown.slice(substitutesAt).split(/^## (?:Legend|Referees)\b/im)[0] ?? "";
+    const playerGroups = substitutesSection
+      .split(/\n\s*\n/)
+      .filter((group) => group.includes("besoccer.com/player/"));
+    const groups = playerGroups.length
+      ? playerGroups
+      : [substitutesSection];
 
-    if (substitutesAt >= 0) {
-      const substitutesSection = section
-        .slice(substitutesAt)
-        .split(/## (?:Legend|Referees)\b/i)[0] ?? "";
-      const playerLinks = /\]\(https?:\/\/www\.besoccer\.com\/player\/[^)]+\)/g;
-      for (const playerLink of substitutesSection.matchAll(playerLinks)) {
+    groups.forEach((group, groupIndex) => {
+      const teamIndex = Math.min(groupIndex, teamNames.length - 1);
+      for (const playerLink of group.matchAll(
+        /\]\(https?:\/\/www\.besoccer\.com\/player\/[^)]+\)/g,
+      )) {
         if (playerLink.index === undefined) continue;
-        const rawLabel = anchorLabel(substitutesSection, playerLink.index);
+        const rawLabel = anchorLabel(group, playerLink.index);
         const name = cleanMarkdown(rawLabel.match(/^\s*([^\[]+)/)?.[1] ?? "");
-        if (!name || players.some((player) => player.name.toLowerCase() === name.toLowerCase())) {
+        if (
+          !name ||
+          substitutesByTeam[teamIndex]?.some(
+            (player) => player.name.toLowerCase() === name.toLowerCase(),
+          )
+        ) {
           continue;
         }
         const playerPhoto = rawLabel.match(
@@ -861,18 +1023,31 @@ function parseLineups(
           : rawLabel;
         const playerNumber = playerInfo.match(/\b(\d{1,2})\s+(?:GK|Def|Mid|Att)\b/i);
         const position = playerInfo.match(/\b(GK|Def|Mid|Att)\b/i)?.[1] ?? null;
-        players.push({
+        const rating = playerInfo.match(/\b(\d{1,2}\.\d)\b/)?.[1];
+        substitutesByTeam[teamIndex]?.push({
           name,
           number: parseNumber(playerNumber?.[1]),
           position,
           photoUrl: playerPhoto?.[1] ?? null,
+          rating: rating ? Number(rating) : null,
           isSubstitute: true,
         });
       }
-    }
-    lineups.push({ team, formation, coach, players });
+    });
   }
-  return lineups;
+
+  return teamNames.map((team, teamIndex) => {
+    const starterPlayers = starterMatches
+      .slice(teamIndex * 11, teamIndex * 11 + 11)
+      .map(parseStarter)
+      .filter((player): player is LineupPlayer => player !== null);
+    return {
+      team,
+      formation: formations[teamIndex] ?? null,
+      coach: coachNames[teamIndex] ?? null,
+      players: [...starterPlayers, ...(substitutesByTeam[teamIndex] ?? [])],
+    };
+  });
 }
 
 function parseEvents(
@@ -912,13 +1087,20 @@ function parseEvents(
     });
   }
 
-  return Array.from(
+  const uniqueEvents = Array.from(
     new Map(
       events.map((event) => [
         `${event.minute}:${event.eventType}:${event.player ?? ""}`,
         event,
       ]),
     ).values(),
+  );
+  const minuteOrder = (minute: string | null) => {
+    const parsed = minute?.match(/(\d+)(?:\+(\d+))?/);
+    return parsed ? Number(parsed[1]) * 100 + Number(parsed[2] ?? 0) : Number.MAX_SAFE_INTEGER;
+  };
+  return uniqueEvents.sort(
+    (left, right) => minuteOrder(left.minute) - minuteOrder(right.minute),
   );
 }
 
@@ -1256,8 +1438,10 @@ function sourcePathForMatch(matchId: string, requestedPath?: string): string {
   const canonicalMatch = path?.match(
     /^\/match\/[a-z0-9-]+\/[a-z0-9-]+\/(\d+)$/i,
   );
+  const knownPath = knownMatchPaths.get(matchId);
+  if (knownPath) return knownPath;
   if (path && canonicalMatch?.[1] === matchId) return path;
-  return knownMatchPaths.get(matchId) ?? `/match/${matchId}`;
+  return `/match/${matchId}`;
 }
 
 export async function listFixturesForDate(date: string): Promise<FixtureList> {
@@ -1344,17 +1528,26 @@ export async function getMatchById(
   matchId: string,
   requestedPath?: string,
 ): Promise<MatchDetails> {
-  const cached = fromCache<MatchDetails>(`match:${matchId}`);
+  const matchPath = sourcePathForMatch(matchId, requestedPath);
+  const matchCacheKey = `match:${matchPath}`;
+  const cached = fromCache<MatchDetails>(matchCacheKey);
   if (cached) return cached;
 
-  const matchPath = sourcePathForMatch(matchId, requestedPath);
   const pages = sourcePageTabs.map((tab) => `${matchPath}/${tab}`);
-  const [mainResult, ...sectionResults] = await Promise.allSettled([
+  const pageResults = await Promise.allSettled([
     getMarkdown(matchPath),
     ...pages.map((path) => getMarkdown(path)),
+    getRawHtml(`${matchPath}/table`),
   ]);
-  if (mainResult.status === "rejected") throw mainResult.reason;
+  const mainResult = pageResults[0];
+  if (!mainResult || mainResult.status === "rejected") {
+    throw mainResult?.reason ?? new Error("The match source did not respond");
+  }
 
+  const sectionResults = pageResults.slice(1, pages.length + 1);
+  const tableHtmlResult = pageResults[pages.length + 1];
+  const tableHtml =
+    tableHtmlResult?.status === "fulfilled" ? tableHtmlResult.value : "";
   const mainMarkdown = mainResult.value;
   const sectionMarkdown = sectionResults.map((result) =>
     result.status === "fulfilled" ? result.value : "",
@@ -1489,14 +1682,25 @@ export async function getMatchById(
         .map((entry) => [entry.bookmaker, entry]),
     ).values(),
   );
+  const parsedStandings = parseStandings(tableMarkdown ?? "");
   const result: MatchDetails = {
     fixture,
     sourceUrl: `${besoccerOrigin}${matchPath}`,
     fetchedAt: new Date(),
     roundMatches,
-    standings: parseStandings(tableMarkdown ?? ""),
+    standings:
+      parsedStandings.length > 0
+        ? parsedStandings
+        : parseStandingRowsFromHtml(tableHtml, "tab_total0"),
+    homeStandings: parseStandingRowsFromHtml(tableHtml, "tab_local0"),
+    awayStandings: parseStandingRowsFromHtml(tableHtml, "tab_visitor0"),
     analysisStats: parseAnalysis(analysisMarkdown ?? ""),
-    previewFacts: parsePreview(previewMarkdown ?? ""),
+    matchStatistics: parseMatchStatistics(eventMarkdown ?? ""),
+    previewFacts: parsePreview(
+      previewMarkdown ?? "",
+      fixture.homeTeam,
+      fixture.awayTeam,
+    ),
     lineups: parseLineups(
       lineupMarkdown ?? "",
       fixture.homeTeam,
@@ -1510,7 +1714,7 @@ export async function getMatchById(
     odds,
     sourcePages,
   };
-  saveCache(`match:${matchId}`, result, 120_000);
+  saveCache(matchCacheKey, result, 120_000);
   return result;
 }
 

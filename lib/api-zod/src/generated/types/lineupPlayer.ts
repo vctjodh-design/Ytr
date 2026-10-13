@@ -14,5 +14,7 @@ export interface LineupPlayer {
   position: string | null;
   /** @nullable */
   photoUrl: string | null;
+  /** @nullable */
+  rating: number | null;
   isSubstitute: boolean;
 }

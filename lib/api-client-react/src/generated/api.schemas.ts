@@ -84,6 +84,8 @@ export interface LineupPlayer {
   position: string | null;
   /** @nullable */
   photoUrl: string | null;
+  /** @nullable */
+  rating: number | null;
   isSubstitute: boolean;
 }
 
@@ -180,7 +182,10 @@ export interface MatchDetails {
   fetchedAt: string;
   roundMatches: Fixture[];
   standings: StandingRow[];
+  homeStandings: StandingRow[];
+  awayStandings: StandingRow[];
   analysisStats: MatchStat[];
+  matchStatistics: MatchStat[];
   previewFacts: PreviewFact[];
   lineups: TeamLineup[];
   events: MatchEvent[];

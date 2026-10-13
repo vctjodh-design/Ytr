@@ -104,7 +104,40 @@ export const GetMatchDetailsResponse = zod.object({
   "goalsAgainst": zod.number().int().nullable(),
   "goalDifference": zod.number().int().nullable()
 })),
+  "homeStandings": zod.array(zod.object({
+  "position": zod.number().int(),
+  "team": zod.string(),
+  "badgeUrl": zod.string().url().nullable(),
+  "form": zod.string().nullable(),
+  "points": zod.number().int().nullable(),
+  "matchesPlayed": zod.number().int().nullable(),
+  "wins": zod.number().int().nullable(),
+  "draws": zod.number().int().nullable(),
+  "losses": zod.number().int().nullable(),
+  "goalsFor": zod.number().int().nullable(),
+  "goalsAgainst": zod.number().int().nullable(),
+  "goalDifference": zod.number().int().nullable()
+})),
+  "awayStandings": zod.array(zod.object({
+  "position": zod.number().int(),
+  "team": zod.string(),
+  "badgeUrl": zod.string().url().nullable(),
+  "form": zod.string().nullable(),
+  "points": zod.number().int().nullable(),
+  "matchesPlayed": zod.number().int().nullable(),
+  "wins": zod.number().int().nullable(),
+  "draws": zod.number().int().nullable(),
+  "losses": zod.number().int().nullable(),
+  "goalsFor": zod.number().int().nullable(),
+  "goalsAgainst": zod.number().int().nullable(),
+  "goalDifference": zod.number().int().nullable()
+})),
   "analysisStats": zod.array(zod.object({
+  "label": zod.string(),
+  "homeValue": zod.string(),
+  "awayValue": zod.string()
+})),
+  "matchStatistics": zod.array(zod.object({
   "label": zod.string(),
   "homeValue": zod.string(),
   "awayValue": zod.string()
@@ -122,6 +155,7 @@ export const GetMatchDetailsResponse = zod.object({
   "number": zod.number().int().nullable(),
   "position": zod.string().nullable(),
   "photoUrl": zod.string().url().nullable(),
+  "rating": zod.number().nullable(),
   "isSubstitute": zod.boolean()
 }))
 })),

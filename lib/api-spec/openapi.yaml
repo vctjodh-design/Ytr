@@ -278,9 +278,11 @@ components:
         photoUrl:
           type: ["string", "null"]
           format: uri
+        rating:
+          type: ["number", "null"]
         isSubstitute:
           type: boolean
-      required: [name, number, position, photoUrl, isSubstitute]
+      required: [name, number, position, photoUrl, rating, isSubstitute]
     TeamLineup:
       type: object
       properties:
@@ -450,7 +452,19 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/StandingRow"
+        homeStandings:
+          type: array
+          items:
+            $ref: "#/components/schemas/StandingRow"
+        awayStandings:
+          type: array
+          items:
+            $ref: "#/components/schemas/StandingRow"
         analysisStats:
+          type: array
+          items:
+            $ref: "#/components/schemas/MatchStat"
+        matchStatistics:
           type: array
           items:
             $ref: "#/components/schemas/MatchStat"
@@ -480,7 +494,10 @@ components:
         - fetchedAt
         - roundMatches
         - standings
+        - homeStandings
+        - awayStandings
         - analysisStats
+        - matchStatistics
         - previewFacts
         - lineups
         - events
