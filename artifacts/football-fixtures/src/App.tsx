@@ -6,6 +6,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
 import HomePage from '@/pages/home';
 import MatchPage from '@/pages/match';
+import PlayerPage from '@/pages/player';
 import TeamPage from '@/pages/team';
 import {
   Route,
@@ -38,6 +39,7 @@ function Router() {
     <RoutedErrorBoundary>
       <Switch>
         <Route path="/" component={HomePage} />
+        <Route path="/player/:playerSlug" component={PlayerPage} />
         <Route path="/team/:teamSlug" component={TeamPage} />
         <Route path="/match/:homeSlug/:awaySlug/:matchId" component={MatchPage} />
         <Route path="/match/:matchId" component={MatchPage} />

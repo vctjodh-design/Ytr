@@ -2406,15 +2406,25 @@ function parsePlayerProfile(html: string, slug: string): PlayerProfile {
   };
   collectHeaderNodes(header);
 
-  const name =
-    textValue(person.name) ??
-    teamNodeText(
-      headerNodes.find((node) => teamNodeHasClass(node, "title")) ?? header,
-    ) ??
-    slug;
   const photoNode = headerNodes.find(
     (node) => node.tag === "img" && /\/img_data\/players\//i.test(node.attrs.src ?? ""),
   );
+  const headerTitle = headerNodes.find((node) => teamNodeHasClass(node, "title"));
+  const candidateNames = [
+    headerTitle ? teamNodeText(headerTitle) : null,
+    photoNode?.attrs.alt,
+    textValue(person.name),
+  ];
+  const name =
+    candidateNames
+      .map((candidate) => candidate?.trim())
+      .find(
+        (candidate): candidate is string =>
+          typeof candidate === "string" &&
+          candidate.length > 0 &&
+          candidate.length < 80 &&
+          !/^(?:be)?soccer(?:\s|$)/i.test(candidate),
+      ) ?? slug;
   const flagNode = headerNodes.find(
     (node) =>
       node.tag === "img" &&
@@ -2485,6 +2495,11 @@ function parsePlayerProfile(html: string, slug: string): PlayerProfile {
     (node) => teamNodeHasClass(node, "elo") && /^\d+$/.test(teamNodeText(node)),
   );
   const birthDate = textValue(person.birthDate);
+  const parsedBirthDate = birthDate ? new Date(birthDate) : null;
+  const validBirthDate =
+    parsedBirthDate && !Number.isNaN(parsedBirthDate.getTime())
+      ? parsedBirthDate
+      : null;
   const ageFromBirthDate = birthDate
     ? (() => {
         const [year, month, day] = birthDate.split("-").map(Number);
@@ -2510,7 +2525,7 @@ function parsePlayerProfile(html: string, slug: string): PlayerProfile {
       }),
     nationality: textValue(asRecord(person.nationality)?.name),
     nationalityFlagUrl: imageUrlFromNode(flagNode ?? { tag: "img", attrs: {}, children: [] }),
-    birthDate,
+    birthDate: validBirthDate,
     age: ageValue ?? ageFromBirthDate,
     heightCm: parseNumber(textValue(asRecord(person.height)?.value) ?? undefined),
     weightKg: parseNumber(textValue(asRecord(person.weight)?.value) ?? undefined),

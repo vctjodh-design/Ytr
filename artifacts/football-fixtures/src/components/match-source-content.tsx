@@ -2,7 +2,7 @@ import { ExternalLink, FileText } from 'lucide-react';
 import { Link } from 'wouter';
 import type { MatchContentPage } from '@workspace/api-client-react';
 
-type SourcePage = MatchContentPage;
+type SourcePage = Pick<MatchContentPage, 'sourceUrl' | 'sections'> & { tab: string };
 
 function safeSourceUrl(value: string): string | null {
   try {

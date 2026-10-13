@@ -1,2 +1,3 @@
 - [BeSoccer fixture lists](besoccer-fixtures.md) — paginate to the final marker, include unmarked AJAX cards, and preserve source-local dates for upcoming-date labels.
 - [BeSoccer team content](besoccer-team-content.md) — parse team tabs from ordered HTML modules; markdown collapses images and page structure.
+- [BeSoccer player names](besoccer-player-content.md) — JSON-LD can identify the site, not the player; validate it and prefer the page title or portrait alt.
