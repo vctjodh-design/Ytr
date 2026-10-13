@@ -26,7 +26,19 @@ function readableDate(value: string) {
 export default function HomePage() {
   const today = localDate(new Date());
   const [date, setDate] = useState(today);
-  const { data, isLoading, isError, refetch, isFetching } = useListFixtures({ date }, { query: { queryKey: getListFixturesQueryKey({ date }) } });
+  const { data, isLoading, isError, refetch, isFetching } = useListFixtures(
+    { date },
+    {
+      query: {
+        queryKey: getListFixturesQueryKey({ date }),
+        staleTime: 0,
+        refetchOnWindowFocus: true,
+        refetchOnReconnect: true,
+        refetchInterval: date === today ? 20_000 : false,
+        refetchIntervalInBackground: false,
+      },
+    },
+  );
   const fixtures = data?.fixtures ?? [];
   const groups = useMemo(() => {
     const collection = new Map<string, typeof fixtures>();
