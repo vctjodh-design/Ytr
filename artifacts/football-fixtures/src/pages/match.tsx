@@ -35,15 +35,17 @@ function TabContent({
   details,
   matchId,
   sourcePath,
+  selectedDate,
 }: {
   tab: Tab;
   details: MatchDetails;
   matchId: string;
   sourcePath?: string;
+  selectedDate: string;
 }) {
   if (tab === 'Rounds') {
     const matches = details.roundMatches ?? [];
-    return matches.length ? <div className="rounds-content">{matches.map((fixture) => <FixtureRow fixture={fixture} key={fixture.id} />)}</div> : <SectionEmpty title="Round fixtures unavailable" detail="The source did not provide other matches from this round." />;
+    return matches.length ? <div className="rounds-content">{matches.map((fixture) => <FixtureRow fixture={fixture} selectedDate={selectedDate} key={fixture.id} />)}</div> : <SectionEmpty title="Round fixtures unavailable" detail="The source did not provide other matches from this round." />;
   }
   if (tab === 'Standings') {
     const rows = details.standings ?? [];
@@ -107,7 +109,7 @@ export default function MatchPage() {
             <nav className="match-tabs" aria-label="Match information sections">{tabs.map((item, index) => <button type="button" aria-pressed={tab === item} className={tab === item ? 'match-tab active' : 'match-tab'} key={item} onClick={() => setTab(item)} data-testid={`tab-${item.toLowerCase()}`}><span className="tab-index">{String(index + 1).padStart(2, '0')}</span>{item}</button>)}</nav>
             <section className="match-data-panel" key={tab}>
               <div className="data-panel-head"><div><p className="eyebrow"><span className="eyebrow-mark">{String(tabs.indexOf(tab) + 1).padStart(2, '0')}</span> MATCH INTELLIGENCE</p><h2>{tab}<em>{tab === 'Rounds' ? ' around it.' : tab === 'Standings' ? ' table.' : tab === 'Lineups' ? ' sheet.' : tab === 'Analysis' ? ' desk.' : tab === 'Preview' ? ' notes.' : tab === 'Events' ? ' log.' : ' market.'}</em></h2></div><span className="data-source">{tab.toUpperCase()} / SOURCE DATA</span></div>
-              <TabContent tab={tab} details={data} matchId={matchId} sourcePath={requestParams?.sourcePath} />
+              <TabContent tab={tab} details={data} matchId={matchId} sourcePath={requestParams?.sourcePath} selectedDate={fixture.kickoff.slice(0, 10)} />
               {tab !== 'Odds' && <MatchSourceContent page={data.sourcePages?.find((page) => page.tab.trim().toLowerCase() === tab.toLowerCase())} tab={tab} />}
             </section>
             <footer className="page-foot match-foot"><span>TOUCHLINE DESK <b>·</b> {fixture.id}</span><span>{data.fetchedAt ? `SOURCE CAPTURED ${new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(data.fetchedAt))}` : 'SOURCE CAPTURE TIME NOT PROVIDED'}<a href={data.sourceUrl || fixture.sourceUrl} target="_blank" rel="noreferrer" aria-label="Open original match source"><ExternalLink size={12} /></a></span></footer>

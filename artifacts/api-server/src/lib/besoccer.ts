@@ -243,6 +243,17 @@ function parseFixtureCards(
     const kickoff = card.match(
       /<p\b(?=[^>]*\bmatch_hour\b)[^>]*>([\s\S]*?)<\/p>/i,
     )?.[1];
+    const kickoffText = kickoff ? cleanHtmlText(kickoff) : "";
+    const sourceStartTime = htmlAttribute(openingTag, "starttime")?.match(
+      /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/,
+    );
+    const kickoffDate =
+      sourceStartTime?.[1] ?? dateFromLabel(kickoffText, date);
+    const kickoffTime =
+      kickoffText.match(/\b\d{1,2}:\d{2}\b/)?.[0] ??
+      (sourceStartTime?.[2] && sourceStartTime[2] !== "00:00"
+        ? sourceStartTime[2]
+        : null);
     const marker = card.match(
       /<div\b(?=[^>]*\bdates\b)[^>]*>([\s\S]*?)<\/div>/i,
     )?.[1];
@@ -270,7 +281,7 @@ function parseFixtureCards(
       homeBadgeUrl: badges[0]?.src ?? null,
       awayTeam: names[1],
       awayBadgeUrl: badges[1]?.src ?? null,
-      kickoff: kickoff ? `${date} ${cleanHtmlText(kickoff)}` : date,
+      kickoff: kickoffTime ? `${kickoffDate} ${kickoffTime}` : kickoffDate,
       status,
       homeScore: null,
       awayScore: null,

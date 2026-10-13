@@ -1,1 +1,1 @@
-- [BeSoccer fixture lists](besoccer-fixtures.md) — follow `/ajax/matchesScroll` until `moreItems=false`; AJAX batches include valid cards without `data-cy="match"`.
+- [BeSoccer fixture lists](besoccer-fixtures.md) — paginate to the final marker, include unmarked AJAX cards, and preserve source-local dates for upcoming-date labels.

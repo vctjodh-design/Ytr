@@ -88,7 +88,7 @@ export default function HomePage() {
               {groups.map(([competition, matches], index) => (
                 <section className="competition-group" key={competition} data-testid={`group-competition-${index}`}>
                   <div className="competition-heading"><span className="competition-index">{String(index + 1).padStart(2, '0')}</span><h2>{competition}</h2><span className="competition-count">{matches.length} MATCH{matches.length === 1 ? '' : 'ES'}</span><span className="competition-rule" /></div>
-                  <div className="fixture-list">{matches.map((fixture) => <FixtureRow fixture={fixture} key={fixture.id} />)}</div>
+                  <div className="fixture-list">{matches.map((fixture) => <FixtureRow fixture={fixture} selectedDate={date} key={fixture.id} />)}</div>
                 </section>
               ))}
             </div>

@@ -7,6 +7,8 @@ BeSoccer livescore pages are incrementally loaded. The date page contains its fi
 
 AJAX responses include valid fixture cards that lack `data-cy="match"` but retain an `id="match-<id>"`, so include those when parsing scroll batches. The source’s `allMatches` count is a useful completeness check. When retrieved through Jina Reader, AJAX markup contains escaped quotes, slashes, and newlines and must be normalized before parsing.
 
+Each match card’s `starttime` carries its source-local calendar date. A selected date can include fixtures from later dates: preserve that date, show `DD MON` for a fixture whose actual date differs from the selected date, and show the kickoff time for same-day fixtures. Some future matches use `00:00` as a placeholder with no actual kickoff time.
+
 **Why:** The first HTML response can contain only 79 of 249 fixtures; relying on it or Markdown alone silently omits matches.
 
-**How to apply:** Follow the source pagination through its final-page marker, merge and deduplicate all batches, and fail explicitly if pagination cannot be confirmed complete. Keep Markdown as a fallback/enrichment source for scores and statuses.
+**How to apply:** Follow the source pagination through its final-page marker, merge and deduplicate all batches, and fail explicitly if pagination cannot be confirmed complete. Use `starttime`’s date without timezone-shifting it; keep Markdown as a fallback/enrichment source for scores and statuses.
