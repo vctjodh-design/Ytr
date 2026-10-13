@@ -1,1 +1,1 @@
-- [BeSoccer fixture lists](besoccer-fixtures.md) — Markdown conversion omits some match cards; parse full page HTML and retain Markdown as a fallback/enrichment source.
+- [BeSoccer fixture lists](besoccer-fixtures.md) — follow `/ajax/matchesScroll` until `moreItems=false`; AJAX batches include valid cards without `data-cy="match"`.

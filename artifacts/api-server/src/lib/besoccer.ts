@@ -112,6 +112,17 @@ async function getRawHtml(path: string): Promise<string> {
   }
 }
 
+function normalizeScrolledHtml(html: string): string {
+  return decodeEntities(
+    html
+      .replace(/\\&quot;/g, '"')
+      .replace(/\\\//g, "/")
+      .replace(/\\n/g, "\n")
+      .replace(/\\"/g, '"')
+      .replace(/=""([^"\n]*)""/g, '="$1"'),
+  );
+}
+
 function decodeEntities(text: string): string {
   return text
     .replace(/&amp;/g, "&")
@@ -166,6 +177,7 @@ function parseFixtureCards(
   html: string,
   date: string,
   competitionKeys?: Map<string, string | null>,
+  includeUnmarkedCards = false,
 ): Fixture[] {
   const competitions = Array.from(
     html.matchAll(
@@ -190,9 +202,10 @@ function parseFixtureCards(
     },
   );
   const fixtures: Fixture[] = [];
-  const cards = html.matchAll(
-    /<a\b(?=[^>]*\bdata-cy=["']match["'])[^>]*>[\s\S]*?<\/a>/gi,
-  );
+  const cardExpression = includeUnmarkedCards
+    ? /<a\b(?=[^>]*(?:\bdata-cy=["']match["']|\bid=["']match-\d+["']))[^>]*>[\s\S]*?<\/a>/gi
+    : /<a\b(?=[^>]*\bdata-cy=["']match["'])[^>]*>[\s\S]*?<\/a>/gi;
+  const cards = html.matchAll(cardExpression);
 
   for (const match of cards) {
     const card = match[0];
@@ -214,24 +227,24 @@ function parseFixtureCards(
 
     const names = Array.from(
       card.matchAll(
-        /<div\b[^>]*class=["'][^"']*\bteam-name\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/gi,
+        /<div\b(?=[^>]*\bteam-name\b)[^>]*>([\s\S]*?)<\/div>/gi,
       ),
       (team) => cleanHtmlText(team[1] ?? ""),
     );
     if (!names[0] || !names[1]) continue;
 
     const badges = Array.from(
-      card.matchAll(/<img\b[^>]*class=["'][^"']*\bteam-shield\b[^"']*["'][^>]*>/gi),
+      card.matchAll(/<img\b(?=[^>]*\bteam-shield\b)[^>]*>/gi),
       (image) => ({
         src: htmlAttribute(image[0], "src"),
         alt: htmlAttribute(image[0], "alt"),
       }),
     );
     const kickoff = card.match(
-      /<p\b[^>]*class=["'][^"']*\bmatch_hour\b[^"']*["'][^>]*>([\s\S]*?)<\/p>/i,
+      /<p\b(?=[^>]*\bmatch_hour\b)[^>]*>([\s\S]*?)<\/p>/i,
     )?.[1];
     const marker = card.match(
-      /<div\b[^>]*class=["'][^"']*\bdates\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i,
+      /<div\b(?=[^>]*\bdates\b)[^>]*>([\s\S]*?)<\/div>/i,
     )?.[1];
     const statusId = htmlAttribute(openingTag, "data-status-id");
     const minute = marker ? cleanHtmlText(marker).match(/\d{1,3}(?:\+\d{1,2})?['’]/)?.[0] : null;
@@ -266,6 +279,65 @@ function parseFixtureCards(
   }
 
   return Array.from(new Map(fixtures.map((fixture) => [fixture.id, fixture])).values());
+}
+
+function parseFixtureScrollConfig(
+  html: string,
+): { keyCache: string; filters: string; url: string } | null {
+  const match = html.match(
+    /\bgenerateMatches\s*\(\s*["']([^"']+)["']\s*,\s*["']([^"']*)["']\s*,\s*'([^']+)'\s*\)/i,
+  );
+  if (!match?.[1] || match[2] === undefined || !match[3]) return null;
+
+  return {
+    keyCache: match[1].trim(),
+    filters: match[2] === "null" ? "" : match[2],
+    url: match[3],
+  };
+}
+
+async function getScrolledFixtures(
+  html: string,
+  date: string,
+  competitionKeys: Map<string, string | null>,
+): Promise<Fixture[]> {
+  const config = parseFixtureScrollConfig(html);
+  if (!config) {
+    if (parseFixtureCards(html, date, competitionKeys).length > 0) {
+      throw new Error("The BeSoccer page omitted its fixture pagination settings");
+    }
+    return [];
+  }
+
+  const fixtures: Fixture[] = [];
+  const maxPage = 30;
+  for (let page = 2; page <= maxPage; page += 1) {
+    const query = new URLSearchParams({
+      keyCache: config.keyCache,
+      page: String(page),
+      filters: config.filters,
+      url: config.url,
+    });
+    const responseHtml = await getRawHtml(
+      `/ajax/matchesScroll?${query.toString()}`,
+    );
+    const moreItems = responseHtml.match(/["']moreItems["']\s*:\s*(true|false)/i);
+    if (!moreItems) {
+      throw new Error(`BeSoccer did not confirm whether fixture page ${page} was final`);
+    }
+
+    fixtures.push(
+      ...parseFixtureCards(
+        normalizeScrolledHtml(responseHtml),
+        date,
+        competitionKeys,
+        true,
+      ),
+    );
+    if (moreItems[1]?.toLowerCase() === "false") return fixtures;
+  }
+
+  throw new Error(`BeSoccer fixture pagination exceeded ${maxPage} pages`);
 }
 
 function anchorLabel(markdown: string, closingBracket: number): string {
@@ -1199,10 +1271,22 @@ export async function listFixturesForDate(date: string): Promise<FixtureList> {
     htmlResult.status === "fulfilled"
       ? parseFixtureCards(htmlResult.value, date, competitionKeys)
       : [];
+  const scrolledFixtures =
+    htmlResult.status === "fulfilled"
+      ? await getScrolledFixtures(htmlResult.value, date, competitionKeys)
+      : [];
   const markdownById = new Map(markdownFixtures.map((fixture) => [fixture.id, fixture]));
-  const htmlIds = new Set(htmlFixtures.map((fixture) => fixture.id));
+  const sourceFixtures = Array.from(
+    new Map(
+      [...htmlFixtures, ...scrolledFixtures].map((fixture) => [
+        fixture.id,
+        fixture,
+      ]),
+    ).values(),
+  );
+  const htmlIds = new Set(sourceFixtures.map((fixture) => fixture.id));
   const fixtures = [
-    ...htmlFixtures.map((fixture) => {
+    ...sourceFixtures.map((fixture) => {
       const textFixture = markdownById.get(fixture.id);
       return textFixture
         ? {
