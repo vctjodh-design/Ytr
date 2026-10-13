@@ -1,0 +1,1 @@
+- [BeSoccer fixture lists](besoccer-fixtures.md) — Markdown conversion omits some match cards; parse full page HTML and retain Markdown as a fallback/enrichment source.

@@ -119,7 +119,15 @@ function decodeEntities(text: string): string {
     .replace(/&quot;/g, '"')
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
-    .replace(/&nbsp;/g, " ");
+    .replace(/&nbsp;/g, " ")
+    .replace(/&#(x[0-9a-f]+|\d+);/gi, (entity, code: string) => {
+      const value = code.toLowerCase().startsWith("x")
+        ? Number.parseInt(code.slice(1), 16)
+        : Number.parseInt(code, 10);
+      return Number.isFinite(value) && value >= 0 && value <= 0x10ffff
+        ? String.fromCodePoint(value)
+        : entity;
+    });
 }
 
 function cleanMarkdown(text: string): string {
@@ -133,6 +141,131 @@ function cleanMarkdown(text: string): string {
       .replace(/\s+/g, " ")
       .trim(),
   );
+}
+
+function cleanHtmlText(text: string): string {
+  return decodeEntities(
+    text
+      .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim(),
+  );
+}
+
+function htmlAttribute(tag: string, name: string): string | null {
+  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const value = tag.match(
+    new RegExp(`\\b${escapedName}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, "i"),
+  );
+  return value?.[1] ?? value?.[2] ?? value?.[3] ?? null;
+}
+
+function parseFixtureCards(
+  html: string,
+  date: string,
+  competitionKeys?: Map<string, string | null>,
+): Fixture[] {
+  const competitions = Array.from(
+    html.matchAll(
+      /<a\b(?=[^>]*\bdata-cy=["']competitionName["'])[^>]*>([\s\S]*?)<\/a>/gi,
+    ),
+    (match) => {
+      const openingTag = match[0].slice(0, match[0].indexOf(">") + 1);
+      let competitionPath = "";
+      try {
+        competitionPath = new URL(
+          htmlAttribute(openingTag, "href") ?? "",
+          besoccerOrigin,
+        ).pathname;
+      } catch {
+        // Keep the competition name even if its source link is malformed.
+      }
+      return {
+        index: match.index ?? 0,
+        name: cleanHtmlText(match[1] ?? ""),
+        key: competitionKeyFromPath(competitionPath),
+      };
+    },
+  );
+  const fixtures: Fixture[] = [];
+  const cards = html.matchAll(
+    /<a\b(?=[^>]*\bdata-cy=["']match["'])[^>]*>[\s\S]*?<\/a>/gi,
+  );
+
+  for (const match of cards) {
+    const card = match[0];
+    const openingTag = card.slice(0, card.indexOf(">") + 1);
+    const matchId =
+      htmlAttribute(openingTag, "id")?.match(/^match-(\d+)$/)?.[1] ??
+      htmlAttribute(openingTag, "href")?.match(/\/(\d+)(?:[?#].*)?$/)?.[1];
+    if (!matchId || match.index === undefined) continue;
+
+    const sourcePath = htmlAttribute(openingTag, "href");
+    if (!sourcePath) continue;
+    let canonicalPath: string;
+    try {
+      canonicalPath = new URL(sourcePath, besoccerOrigin).pathname;
+    } catch {
+      continue;
+    }
+    if (!/^\/match\/[a-z0-9-]+\/[a-z0-9-]+\/\d+$/i.test(canonicalPath)) continue;
+
+    const names = Array.from(
+      card.matchAll(
+        /<div\b[^>]*class=["'][^"']*\bteam-name\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/gi,
+      ),
+      (team) => cleanHtmlText(team[1] ?? ""),
+    );
+    if (!names[0] || !names[1]) continue;
+
+    const badges = Array.from(
+      card.matchAll(/<img\b[^>]*class=["'][^"']*\bteam-shield\b[^"']*["'][^>]*>/gi),
+      (image) => ({
+        src: htmlAttribute(image[0], "src"),
+        alt: htmlAttribute(image[0], "alt"),
+      }),
+    );
+    const kickoff = card.match(
+      /<p\b[^>]*class=["'][^"']*\bmatch_hour\b[^"']*["'][^>]*>([\s\S]*?)<\/p>/i,
+    )?.[1];
+    const marker = card.match(
+      /<div\b[^>]*class=["'][^"']*\bdates\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i,
+    )?.[1];
+    const statusId = htmlAttribute(openingTag, "data-status-id");
+    const minute = marker ? cleanHtmlText(marker).match(/\d{1,3}(?:\+\d{1,2})?['’]/)?.[0] : null;
+    const status =
+      statusId === "4"
+        ? "Finished"
+        : statusId === "3"
+          ? minute
+            ? `${minute.replace(/['’]$/, "")}′`
+            : "Live"
+          : marker && /postponed/i.test(marker)
+            ? "Postponed"
+            : marker && /cancelled/i.test(marker)
+              ? "Cancelled"
+              : "Scheduled";
+
+    fixtures.push({
+      id: matchId,
+      sourceUrl: `${besoccerOrigin}${canonicalPath}`,
+      competition: getCompetitionAt(competitions, match.index, "Football"),
+      round: null,
+      homeTeam: names[0],
+      homeBadgeUrl: badges[0]?.src ?? null,
+      awayTeam: names[1],
+      awayBadgeUrl: badges[1]?.src ?? null,
+      kickoff: kickoff ? `${date} ${cleanHtmlText(kickoff)}` : date,
+      status,
+      homeScore: null,
+      awayScore: null,
+    });
+    competitionKeys?.set(matchId, getCompetitionKeyAt(competitions, match.index));
+  }
+
+  return Array.from(new Map(fixtures.map((fixture) => [fixture.id, fixture])).values());
 }
 
 function anchorLabel(markdown: string, closingBracket: number): string {
@@ -1043,9 +1176,46 @@ export async function listFixturesForDate(date: string): Promise<FixtureList> {
   if (cached) return cached;
 
   const path = `/livescore/${date}`;
-  const markdown = await getMarkdown(path);
   const competitionKeys = new Map<string, string | null>();
-  const fixtures = parseFixtureLinks(markdown, date, "Football", null, competitionKeys);
+  const [markdownResult, htmlResult] = await Promise.allSettled([
+    getMarkdown(path),
+    getRawHtml(path),
+  ]);
+  if (markdownResult.status === "rejected" && htmlResult.status === "rejected") {
+    throw markdownResult.reason;
+  }
+
+  const markdownFixtures =
+    markdownResult.status === "fulfilled"
+      ? parseFixtureLinks(
+          markdownResult.value,
+          date,
+          "Football",
+          null,
+          competitionKeys,
+        )
+      : [];
+  const htmlFixtures =
+    htmlResult.status === "fulfilled"
+      ? parseFixtureCards(htmlResult.value, date, competitionKeys)
+      : [];
+  const markdownById = new Map(markdownFixtures.map((fixture) => [fixture.id, fixture]));
+  const htmlIds = new Set(htmlFixtures.map((fixture) => fixture.id));
+  const fixtures = [
+    ...htmlFixtures.map((fixture) => {
+      const textFixture = markdownById.get(fixture.id);
+      return textFixture
+        ? {
+            ...fixture,
+            round: textFixture.round,
+            status: textFixture.status,
+            homeScore: textFixture.homeScore,
+            awayScore: textFixture.awayScore,
+          }
+        : fixture;
+    }),
+    ...markdownFixtures.filter((fixture) => !htmlIds.has(fixture.id)),
+  ];
   for (const fixture of fixtures) {
     knownFixtures.set(fixture.id, fixture);
     const competitionKey = competitionKeys.get(fixture.id);
