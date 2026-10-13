@@ -10,6 +10,10 @@ import type {
   OddsEntry,
   PreviewFact,
   StandingRow,
+  TeamContentPage,
+  TeamContentPageTab,
+  TeamDetails,
+  TeamProfile,
   TeamLineup,
 } from "@workspace/api-zod";
 
@@ -680,6 +684,10 @@ function parseStandings(markdown: string): StandingRow[] {
     const position = parseNumber(cells[0]) ?? 0;
     const teamLink = cells[2]?.match(/\[([^\]]+)\]\(/);
     const team = cleanMarkdown(teamLink?.[1] ?? cells[2] ?? "");
+    const teamSlug =
+      cells[2]?.match(
+        /(?:https?:\/\/(?:www\.)?besoccer\.com)?\/team\/([a-z0-9-]+)/i,
+      )?.[1] ?? null;
     if (!team) continue;
 
     const formMatch = cells[2]?.match(/\]\([^)]+\)\s*(.*)$/);
@@ -687,6 +695,7 @@ function parseStandings(markdown: string): StandingRow[] {
     rows.push({
       position,
       team,
+      teamSlug,
       badgeUrl,
       form: formMatch?.[1] ? cleanMarkdown(formMatch[1]) : null,
       points: parseNumber(cells[3]),
@@ -739,6 +748,9 @@ function parseStandingRowsFromHtml(
         "",
     );
     if (position === null || !team) continue;
+    const teamAnchor = cells[2]?.match(/<a\b[^>]*>/i)?.[0] ?? "";
+    const teamHref = htmlAttribute(teamAnchor, "href");
+    const teamSlug = teamHref?.match(/\/team\/([a-z0-9-]+)/i)?.[1] ?? null;
 
     const form = Array.from(
       (cells[2] ?? "").matchAll(
@@ -755,6 +767,7 @@ function parseStandingRowsFromHtml(
     rows.push({
       position,
       team,
+      teamSlug,
       badgeUrl: cells[1]?.match(/<img\b[^>]*>/i)?.[0]
         ? htmlAttribute(cells[1]?.match(/<img\b[^>]*>/i)?.[0] ?? "", "src")
         : null,
@@ -1326,6 +1339,7 @@ function isPageChrome(line: string): boolean {
     /^play responsibly/.test(text) ||
     /^legal notices and privacy/.test(text) ||
     /^sign in with google/.test(text) ||
+    /^log in$/.test(text) ||
     /^continuar con facebook/.test(text) ||
     /^login or register$/.test(text) ||
     /^login$/.test(text) ||
@@ -1347,6 +1361,7 @@ function isPageChrome(line: string): boolean {
     /^password must/.test(text) ||
     /^registration successful/.test(text) ||
     /^i am over 14 years old$/.test(text) ||
+    /^\[x\]\s*i am over 14 years old$/.test(text) ||
     /^congratulations!$/.test(text) ||
     /^you must be logged in/.test(text) ||
     /^make a new account/.test(text) ||
@@ -1358,6 +1373,11 @@ function isPageChrome(line: string): boolean {
     /^microphone permissions/.test(text) ||
     /^error attempting to use the microphone/.test(text) ||
     /^your device is not compatible/.test(text)
+    || /^follow the match live$/.test(text)
+    || /^content access$/.test(text)
+    || /^watch an ad to listen to the match broadcast$/.test(text)
+    || /^listen live$/.test(text)
+    || /^x$/.test(text)
   );
 }
 
@@ -1717,6 +1737,140 @@ export async function getMatchById(
     sourcePages,
   };
   saveCache(matchCacheKey, result, 120_000);
+  return result;
+}
+
+const teamPageSources: Array<{
+  tab: TeamContentPageTab;
+  suffix: string;
+}> = [
+  { tab: "info", suffix: "" },
+  { tab: "matches", suffix: "matches" },
+  { tab: "transfers", suffix: "transfers" },
+  { tab: "squad", suffix: "squad" },
+  { tab: "standings", suffix: "table" },
+  { tab: "career", suffix: "career-path" },
+  { tab: "competitions", suffix: "competitions" },
+  { tab: "injuries-suspensions", suffix: "injuries-suspensions" },
+  { tab: "honours", suffix: "honours" },
+  { tab: "historical", suffix: "history" },
+];
+
+function teamProfilePath(slug: string, suffix: string): string {
+  return suffix ? `/team/${suffix}/${slug}` : `/team/${slug}`;
+}
+
+function parseTeamProfile(markdown: string, slug: string): TeamProfile {
+  const statisticsHeading = markdown.match(
+    /^#\s+(.+?)(?:[’'´]s)?\s+statistics season\b/im,
+  )?.[1]?.trim();
+  const title = markdown.match(/^Title:\s*(.+)$/im)?.[1]?.trim() ?? "";
+  const titleName = title
+    .replace(/\s+live score\b.*$/i, "")
+    .replace(/\s*\|\s*BeSoccer.*$/i, "")
+    .trim();
+  const name = statisticsHeading || titleName || slug;
+
+  const badgeCandidates = Array.from(
+    markdown.matchAll(/!\[[^\]]*:\s*([^\]]+)\]\((https?:\/\/[^)]+)\)/g),
+  ).filter(
+    (match) =>
+      match[1]?.trim().toLocaleLowerCase() === name.toLocaleLowerCase() &&
+      /\/img_data\/equipos\//i.test(match[2] ?? ""),
+  );
+  const infoTabsIndex = markdown.indexOf(
+    `[Info](${besoccerOrigin}/team/${slug})`,
+  );
+  const badge =
+    badgeCandidates
+      .filter((match) => infoTabsIndex >= 0 && (match.index ?? -1) < infoTabsIndex)
+      .at(-1) ??
+    badgeCandidates.find((match) => /[?&]size=120x(?:&|$)/i.test(match[2] ?? "")) ??
+    badgeCandidates[0];
+  const badgeUrl = badge?.[2] ?? null;
+  const badgeIndex = badge?.index ?? -1;
+  const badgeEnd =
+    badgeIndex >= 0 ? badgeIndex + (badge?.[0]?.length ?? 0) : -1;
+  const nearbyProfile = badgeIndex >= 0
+    ? markdown.slice(Math.max(0, badgeIndex - 500), badgeIndex)
+    : markdown;
+  const flagMatch = Array.from(
+    nearbyProfile.matchAll(
+      /!\[[^\]]*\]\((https?:\/\/[^)]*\/media\/img\/flags\/round\/([a-z]{2})\.png[^)]*)\)/gi,
+    ),
+  ).at(-1);
+  const countryCode = flagMatch?.[2]?.toUpperCase();
+  const country = countryCode
+    ? new Intl.DisplayNames(["en"], { type: "region" }).of(countryCode) ?? countryCode
+    : null;
+  const infoBlock = badgeEnd >= 0
+    ? markdown.slice(
+        badgeEnd,
+        infoTabsIndex > badgeEnd ? infoTabsIndex : badgeEnd + 100,
+      )
+    : "";
+  const elo =
+    infoBlock
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .find((line) => /^\d{2,3}$/.test(line)) ?? null;
+
+  return {
+    slug,
+    name,
+    badgeUrl,
+    country,
+    countryFlagUrl: flagMatch?.[1] ?? null,
+    elo,
+    sourceUrl: `${besoccerOrigin}${teamProfilePath(slug, "")}`,
+  };
+}
+
+function parseTeamSections(
+  markdown: string,
+  slug: string,
+  tab: TeamContentPageTab,
+): TeamContentPage["sections"] {
+  const tabLink = markdown.indexOf(`/team/${slug})`);
+  const lineEnd = tabLink >= 0 ? markdown.indexOf("\n", tabLink) : -1;
+  let content = lineEnd >= 0 ? markdown.slice(lineEnd + 1) : markdown;
+  if (tab === "info") {
+    const firstTeamSection = content.search(/^##\s+/m);
+    if (firstTeamSection >= 0) content = content.slice(firstTeamSection);
+  }
+  return parseSourceSections(content);
+}
+
+export async function getTeamDetails(teamSlug: string): Promise<TeamDetails> {
+  const cached = fromCache<TeamDetails>(`team:${teamSlug}`);
+  if (cached) return cached;
+
+  const results = await Promise.allSettled(
+    teamPageSources.map(({ suffix }) =>
+      getMarkdown(teamProfilePath(teamSlug, suffix)),
+    ),
+  );
+  const infoResult = results[0];
+  if (!infoResult || infoResult.status === "rejected") {
+    throw infoResult?.reason ?? new Error("Team profile is not available");
+  }
+
+  const pages: TeamContentPage[] = teamPageSources.map((source, index) => {
+    const result = results[index];
+    return {
+      tab: source.tab,
+      sourceUrl: `${besoccerOrigin}${teamProfilePath(teamSlug, source.suffix)}`,
+      sections:
+        result?.status === "fulfilled"
+          ? parseTeamSections(result.value, teamSlug, source.tab)
+          : [],
+    };
+  });
+  const result = {
+    team: parseTeamProfile(infoResult.value, teamSlug),
+    pages,
+  };
+  saveCache(`team:${teamSlug}`, result, 120_000);
   return result;
 }
 

@@ -44,6 +44,8 @@ export interface StandingRow {
   position: number;
   team: string;
   /** @nullable */
+  teamSlug: string | null;
+  /** @nullable */
   badgeUrl: string | null;
   /** @nullable */
   form: string | null;
@@ -191,6 +193,47 @@ export interface MatchDetails {
   events: MatchEvent[];
   odds: OddsEntry[];
   sourcePages: MatchContentPage[];
+}
+
+export interface TeamProfile {
+  slug: string;
+  name: string;
+  /** @nullable */
+  badgeUrl: string | null;
+  /** @nullable */
+  country: string | null;
+  /** @nullable */
+  countryFlagUrl: string | null;
+  /** @nullable */
+  elo: string | null;
+  sourceUrl: string;
+}
+
+export type TeamContentPageTab = typeof TeamContentPageTab[keyof typeof TeamContentPageTab];
+
+
+export const TeamContentPageTab = {
+  info: 'info',
+  matches: 'matches',
+  transfers: 'transfers',
+  squad: 'squad',
+  standings: 'standings',
+  career: 'career',
+  competitions: 'competitions',
+  'injuries-suspensions': 'injuries-suspensions',
+  honours: 'honours',
+  historical: 'historical',
+} as const;
+
+export interface TeamContentPage {
+  tab: TeamContentPageTab;
+  sourceUrl: string;
+  sections: MatchContentSection[];
+}
+
+export interface TeamDetails {
+  team: TeamProfile;
+  pages: TeamContentPage[];
 }
 
 export type ListFixturesParams = {

@@ -54,6 +54,17 @@ function numericValue(value: string) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function teamSlugFromMatchSource(sourceUrl: string, side: 'home' | 'away') {
+  try {
+    const match = new URL(sourceUrl).pathname.match(
+      /^\/match\/([a-z0-9-]+)\/([a-z0-9-]+)\/\d+$/i,
+    );
+    return match?.[side === 'home' ? 1 : 2] ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function StandingTable({ rows }: { rows: StandingRow[] }) {
   return (
     <div className="table-scroll standings-scroll">
@@ -79,7 +90,7 @@ function StandingTable({ rows }: { rows: StandingRow[] }) {
               <td className="position-cell">{row.position ?? '—'}</td>
               <td>
                 <span className="standing-team">
-                  <TeamCrest src={row.badgeUrl} name={row.team} size="sm" />
+                  <TeamCrest src={row.badgeUrl} name={row.team} size="sm" teamSlug={row.teamSlug} />
                   <span>{row.team}</span>
                 </span>
               </td>
@@ -509,7 +520,12 @@ export default function MatchPage() {
               </div>
               <div className="match-scoreboard">
                 <div className="score-team score-home" data-testid="match-home-team">
-                  <TeamCrest src={fixture.homeBadgeUrl} name={fixture.homeTeam} size="lg" />
+                  <TeamCrest
+                    src={fixture.homeBadgeUrl}
+                    name={fixture.homeTeam}
+                    size="lg"
+                    teamSlug={homeSlug ?? teamSlugFromMatchSource(fixture.sourceUrl, 'home')}
+                  />
                   <h1>{fixture.homeTeam}</h1>
                 </div>
                 <div className="score-middle">
@@ -531,7 +547,12 @@ export default function MatchPage() {
                   <span className="kickoff-detail" data-testid="match-kickoff">{formatKickoff(fixture.kickoff)}</span>
                 </div>
                 <div className="score-team score-away" data-testid="match-away-team">
-                  <TeamCrest src={fixture.awayBadgeUrl} name={fixture.awayTeam} size="lg" />
+                  <TeamCrest
+                    src={fixture.awayBadgeUrl}
+                    name={fixture.awayTeam}
+                    size="lg"
+                    teamSlug={awaySlug ?? teamSlugFromMatchSource(fixture.sourceUrl, 'away')}
+                  />
                   <h1>{fixture.awayTeam}</h1>
                 </div>
               </div>

@@ -43,30 +43,49 @@ function matchHref(fixture: Fixture) {
   return `/match/${encodeURIComponent(fixture.id)}`;
 }
 
+function fixtureTeamSlugs(fixture: Fixture) {
+  try {
+    const path = new URL(fixture.sourceUrl).pathname;
+    const match = path.match(/^\/match\/([a-z0-9-]+)\/([a-z0-9-]+)\/\d+$/i);
+    return { home: match?.[1] ?? null, away: match?.[2] ?? null };
+  } catch {
+    return { home: null, away: null };
+  }
+}
+
 export function FixtureRow({ fixture, selectedDate }: { fixture: Fixture; selectedDate: string }) {
   const isLive = matchState(fixture, selectedDate) === 'LIVE';
   const hasScore = fixture.homeScore !== null && fixture.awayScore !== null;
+  const teamSlugs = fixtureTeamSlugs(fixture);
+  const href = matchHref(fixture);
   return (
-    <Link href={matchHref(fixture)} className="fixture-row" data-testid={`link-fixture-${fixture.id}`}>
+    <div className="fixture-row" data-testid={`fixture-${fixture.id}`}>
       <div className="fixture-state">
         <span className={isLive ? 'live-label' : 'kickoff-label'}>{isLive && <i />}{matchState(fixture, selectedDate)}</span>
         {fixture.round && <span className="fixture-round">{fixture.round}</span>}
       </div>
       <div className="fixture-versus">
         <div className="fixture-team home-team">
-          <TeamCrest src={fixture.homeBadgeUrl} name={fixture.homeTeam} />
+          <TeamCrest src={fixture.homeBadgeUrl} name={fixture.homeTeam} teamSlug={teamSlugs.home} />
           <span>{fixture.homeTeam}</span>
         </div>
-        <div className={`fixture-score ${hasScore ? 'has-score' : ''}`}>
+        <Link
+          href={href}
+          className={`fixture-score ${hasScore ? 'has-score' : ''}`}
+          aria-label={`Open ${fixture.homeTeam} versus ${fixture.awayTeam}`}
+          data-testid={`link-fixture-${fixture.id}`}
+        >
           {hasScore ? <><b>{fixture.homeScore}</b><span>–</span><b>{fixture.awayScore}</b></> : <span className="versus-at">vs</span>}
-        </div>
+        </Link>
         <div className="fixture-team away-team">
-          <TeamCrest src={fixture.awayBadgeUrl} name={fixture.awayTeam} />
+          <TeamCrest src={fixture.awayBadgeUrl} name={fixture.awayTeam} teamSlug={teamSlugs.away} />
           <span>{fixture.awayTeam}</span>
         </div>
       </div>
-      <span className="fixture-open"><ArrowUpRight size={16} /></span>
-    </Link>
+      <Link href={href} className="fixture-open" aria-label={`Open ${fixture.homeTeam} versus ${fixture.awayTeam}`}>
+        <ArrowUpRight size={16} />
+      </Link>
+    </div>
   );
 }
 

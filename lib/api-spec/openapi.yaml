@@ -12,6 +12,8 @@ tags:
     description: Health operations
   - name: fixtures
     description: BeSoccer fixture and match data
+  - name: teams
+    description: BeSoccer team profile data
 paths:
   /healthz:
     get:
@@ -131,6 +133,37 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /teams/{teamSlug}:
+    get:
+      operationId: getTeamDetails
+      tags: [teams]
+      summary: Get BeSoccer team profile and tab data
+      parameters:
+        - name: teamSlug
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[a-z0-9-]+$"
+      responses:
+        "200":
+          description: Team profile, fixtures, transfers, squad, standings, media, and news
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamDetails"
+        "404":
+          description: Team not found or unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: BeSoccer team data could not be retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 components:
   schemas:
     HealthStatus:
@@ -214,6 +247,8 @@ components:
           type: integer
         team:
           type: string
+        teamSlug:
+          type: ["string", "null"]
         badgeUrl:
           type: ["string", "null"]
           format: uri
@@ -238,6 +273,7 @@ components:
       required:
         - position
         - team
+        - teamSlug
         - badgeUrl
         - form
         - points
@@ -503,4 +539,49 @@ components:
         - events
         - odds
         - sourcePages
+    TeamProfile:
+      type: object
+      properties:
+        slug:
+          type: string
+        name:
+          type: string
+        badgeUrl:
+          type: ["string", "null"]
+          format: uri
+        country:
+          type: ["string", "null"]
+        countryFlagUrl:
+          type: ["string", "null"]
+          format: uri
+        elo:
+          type: ["string", "null"]
+        sourceUrl:
+          type: string
+          format: uri
+      required: [slug, name, badgeUrl, country, countryFlagUrl, elo, sourceUrl]
+    TeamDetails:
+      type: object
+      properties:
+        team:
+          $ref: "#/components/schemas/TeamProfile"
+        pages:
+          type: array
+          items:
+            $ref: "#/components/schemas/TeamContentPage"
+      required: [team, pages]
+    TeamContentPage:
+      type: object
+      properties:
+        tab:
+          type: string
+          enum: [info, matches, transfers, squad, standings, career, competitions, injuries-suspensions, honours, historical]
+        sourceUrl:
+          type: string
+          format: uri
+        sections:
+          type: array
+          items:
+            $ref: "#/components/schemas/MatchContentSection"
+      required: [tab, sourceUrl, sections]
 

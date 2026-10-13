@@ -20,5 +20,9 @@ export type {
   OddsPeriod,
   PreviewFact,
   StandingRow,
+  TeamContentPage,
+  TeamContentPageTab,
+  TeamDetails,
+  TeamProfile,
   TeamLineup,
 } from "./generated/types";

@@ -93,6 +93,7 @@ export const GetMatchDetailsResponse = zod.object({
   "standings": zod.array(zod.object({
   "position": zod.number().int(),
   "team": zod.string(),
+  "teamSlug": zod.string().nullable(),
   "badgeUrl": zod.string().url().nullable(),
   "form": zod.string().nullable(),
   "points": zod.number().int().nullable(),
@@ -107,6 +108,7 @@ export const GetMatchDetailsResponse = zod.object({
   "homeStandings": zod.array(zod.object({
   "position": zod.number().int(),
   "team": zod.string(),
+  "teamSlug": zod.string().nullable(),
   "badgeUrl": zod.string().url().nullable(),
   "form": zod.string().nullable(),
   "points": zod.number().int().nullable(),
@@ -121,6 +123,7 @@ export const GetMatchDetailsResponse = zod.object({
   "awayStandings": zod.array(zod.object({
   "position": zod.number().int(),
   "team": zod.string(),
+  "teamSlug": zod.string().nullable(),
   "badgeUrl": zod.string().url().nullable(),
   "form": zod.string().nullable(),
   "points": zod.number().int().nullable(),
@@ -223,6 +226,41 @@ export const GetMatchOddsResponse = zod.object({
   "active": zod.boolean(),
   "winner": zod.boolean()
 }))
+}))
+}))
+}))
+})
+
+
+/**
+ * @summary Get BeSoccer team profile and tab data
+ */
+export const getTeamDetailsPathTeamSlugRegExp = new RegExp('^[a-z0-9-]+$');
+
+
+export const GetTeamDetailsParams = zod.object({
+  "teamSlug": zod.coerce.string().regex(getTeamDetailsPathTeamSlugRegExp)
+})
+
+export const GetTeamDetailsResponse = zod.object({
+  "team": zod.object({
+  "slug": zod.string(),
+  "name": zod.string(),
+  "badgeUrl": zod.string().url().nullable(),
+  "country": zod.string().nullable(),
+  "countryFlagUrl": zod.string().url().nullable(),
+  "elo": zod.string().nullable(),
+  "sourceUrl": zod.string().url()
+}),
+  "pages": zod.array(zod.object({
+  "tab": zod.enum(['info', 'matches', 'transfers', 'squad', 'standings', 'career', 'competitions', 'injuries-suspensions', 'honours', 'historical']),
+  "sourceUrl": zod.string().url(),
+  "sections": zod.array(zod.object({
+  "title": zod.string(),
+  "text": zod.array(zod.string()),
+  "tables": zod.array(zod.object({
+  "headers": zod.array(zod.string()),
+  "rows": zod.array(zod.array(zod.string()))
 }))
 }))
 }))

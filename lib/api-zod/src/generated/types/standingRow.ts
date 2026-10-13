@@ -10,6 +10,8 @@ export interface StandingRow {
   position: number;
   team: string;
   /** @nullable */
+  teamSlug: string | null;
+  /** @nullable */
   badgeUrl: string | null;
   /** @nullable */
   form: string | null;

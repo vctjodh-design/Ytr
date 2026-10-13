@@ -29,4 +29,8 @@ export * from './oddsOutcome';
 export * from './oddsPeriod';
 export * from './previewFact';
 export * from './standingRow';
+export * from './teamContentPage';
+export * from './teamContentPageTab';
+export * from './teamDetails';
 export * from './teamLineup';
+export * from './teamProfile';
