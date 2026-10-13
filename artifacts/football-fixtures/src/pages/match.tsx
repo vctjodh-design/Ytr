@@ -204,38 +204,44 @@ function Rating({ rating }: { rating: number | null }) {
 }
 
 function PlayerPhoto({ player }: { player: MatchDetails['lineups'][number]['players'][number] }) {
-  const photo = player.photoUrl ? (
+  return player.photoUrl ? (
     <img className="player-photo" src={player.photoUrl} alt="" loading="lazy" />
   ) : (
     <span className="player-photo-fallback" aria-hidden="true">{player.name.slice(0, 1)}</span>
   );
-  return player.playerSlug ? (
-    <Link
-      className="lineup-player-photo-link"
-      href={`/player/${encodeURIComponent(player.playerSlug)}`}
-      aria-label={`Open ${player.name} player profile`}
-    >
-      {photo}
-    </Link>
-  ) : photo;
 }
 
 function PlayerName({ player }: { player: MatchDetails['lineups'][number]['players'][number] }) {
-  const name = (
-    <>
+  return (
+    <span className="player-name">
       <strong>{player.name}</strong>
       {player.position && <small>{player.position}</small>}
+    </span>
+  );
+}
+
+function LineupPlayerRow({ player }: { player: MatchDetails['lineups'][number]['players'][number] }) {
+  const className = `player-row${player.isSubstitute ? ' is-substitute' : ''}`;
+  const content = (
+    <>
+      <span className="player-number">{player.number ?? '—'}</span>
+      <PlayerPhoto player={player} />
+      <PlayerName player={player} />
+      <Rating rating={player.rating} />
     </>
   );
+
   return player.playerSlug ? (
     <Link
-      className="player-name lineup-player-name-link"
+      className={`${className} player-row-link`}
       href={`/player/${encodeURIComponent(player.playerSlug)}`}
+      aria-label={`Open ${player.name} player profile`}
+      data-testid={`link-player-${player.playerSlug}`}
     >
-      {name}
+      {content}
     </Link>
   ) : (
-    <span className="player-name">{name}</span>
+    <div className={className}>{content}</div>
   );
 }
 
@@ -275,12 +281,7 @@ function LineupsContent({ details }: { details: MatchDetails }) {
                     <div className="lineup-group-label"><span>Starting XI</span><span>{starters.length}</span></div>
                     <div className="player-list">
                       {starters.map((player, index) => (
-                        <div className="player-row" key={`${player.name}-${index}`}>
-                          <span className="player-number">{player.number ?? '—'}</span>
-                          <PlayerPhoto player={player} />
-                          <PlayerName player={player} />
-                          <Rating rating={player.rating} />
-                        </div>
+                        <LineupPlayerRow player={player} key={`${player.name}-${index}`} />
                       ))}
                     </div>
                   </div>
@@ -290,12 +291,7 @@ function LineupsContent({ details }: { details: MatchDetails }) {
                     <div className="lineup-group-label"><span>Substitutes</span><span>{substitutes.length}</span></div>
                     <div className="player-list">
                       {substitutes.map((player, index) => (
-                        <div className="player-row is-substitute" key={`${player.name}-${index}`}>
-                          <span className="player-number">{player.number ?? '—'}</span>
-                          <PlayerPhoto player={player} />
-                          <PlayerName player={player} />
-                          <Rating rating={player.rating} />
-                        </div>
+                        <LineupPlayerRow player={player} key={`${player.name}-${index}`} />
                       ))}
                     </div>
                   </div>
