@@ -269,7 +269,21 @@ function LineupsContent({ details }: { details: MatchDetails }) {
                 <h3>{lineup.team}</h3>
                 <span>
                   {lineup.formation || 'FORMATION NOT SUPPLIED'}
-                  {lineup.coach ? ` · ${lineup.coach}` : ''}
+                  {lineup.coach && (
+                    <>
+                      {' · '}
+                      {lineup.coachSlug ? (
+                        <a
+                          href={`https://www.besoccer.com/coach/${encodeURIComponent(lineup.coachSlug)}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="lineup-coach-link"
+                        >
+                          {lineup.coach}
+                        </a>
+                      ) : lineup.coach}
+                    </>
+                  )}
                 </span>
               </div>
               <span className="player-count">{players.length} PLAYERS</span>

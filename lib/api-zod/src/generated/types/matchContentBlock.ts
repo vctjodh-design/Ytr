@@ -16,4 +16,6 @@ export interface MatchContentBlock {
   rows?: string[][];
   playerSlug?: string;
   playerSlugs?: ((string | null)[])[];
+  coachSlug?: string;
+  coachSlugs?: ((string | null)[])[];
 }

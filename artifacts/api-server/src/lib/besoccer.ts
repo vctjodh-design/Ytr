@@ -978,11 +978,10 @@ function parseLineups(
     starterSection.matchAll(/\b\d{1,2}-\d{1,2}(?:-\d{1,2}){1,2}\b/g),
     (match) => match[0],
   );
-  const coachNames = Array.from(
+  const coachMatches = Array.from(
     markdown.matchAll(
-      /\[\*\*([^\]]+)\*\*\]\(https?:\/\/www\.besoccer\.com\/coach\/[^)]+\)/gi,
+      /\[\*\*([^\]]+)\*\*\]\((https?:\/\/www\.besoccer\.com\/coach\/[^)]+)\)/gi,
     ),
-    (match) => cleanMarkdown(match[1] ?? ""),
   );
 
   const parseStarter = (playerMatch: RegExpMatchArray): LineupPlayer | null => {
@@ -1063,7 +1062,10 @@ function parseLineups(
     return {
       team,
       formation: formations[teamIndex] ?? null,
-      coach: coachNames[teamIndex] ?? null,
+      coach: coachMatches[teamIndex]
+        ? cleanMarkdown(coachMatches[teamIndex]?.[1] ?? "")
+        : null,
+      coachSlug: coachSlugFromSourceUrl(coachMatches[teamIndex]?.[2] ?? ""),
       players: [...starterPlayers, ...(substitutesByTeam[teamIndex] ?? [])],
     };
   });
@@ -2135,6 +2137,23 @@ function playerSlugFromSourceUrl(sourceUrl: string): string | null {
   }
 }
 
+function coachSlugFromSourceUrl(sourceUrl: string): string | null {
+  try {
+    const url = new URL(sourceUrl, besoccerOrigin);
+    if (
+      !["besoccer.com", "www.besoccer.com"].includes(url.hostname.toLowerCase())
+    ) {
+      return null;
+    }
+    const segments = url.pathname.split("/").filter(Boolean);
+    if (segments[0] !== "coach") return null;
+    const slug = segments.at(-1) ?? "";
+    return /^[a-z0-9-]+$/i.test(slug) ? slug : null;
+  } catch {
+    return null;
+  }
+}
+
 function findLinkedPlayerSlug(node: TeamHtmlNode): string | null {
   if (node.tag === "a") {
     const slug = playerSlugFromSourceUrl(node.attrs.href ?? "");
@@ -2149,11 +2168,26 @@ function findLinkedPlayerSlug(node: TeamHtmlNode): string | null {
   return null;
 }
 
+function findLinkedCoachSlug(node: TeamHtmlNode): string | null {
+  if (node.tag === "a") {
+    const slug = coachSlugFromSourceUrl(node.attrs.href ?? "");
+    if (slug) return slug;
+  }
+  for (const child of node.children) {
+    if (typeof child !== "string") {
+      const slug = findLinkedCoachSlug(child);
+      if (slug) return slug;
+    }
+  }
+  return null;
+}
+
 function collectTeamBlocks(
   node: TeamHtmlNode,
   blocks: TeamContentBlock[],
   excludedHeading = "",
   playerSlug: string | null = null,
+  coachSlug: string | null = null,
 ): void {
   if (teamNodeHidden(node) || ["script", "style", "svg", "iframe", "noscript"].includes(node.tag)) {
     return;
@@ -2171,6 +2205,7 @@ function collectTeamBlocks(
         imageUrl,
         imageAlt,
         ...(playerSlug ? { playerSlug } : {}),
+        ...(coachSlug ? { coachSlug } : {}),
       });
     }
     return;
@@ -2178,6 +2213,7 @@ function collectTeamBlocks(
 
   if (node.tag === "a") {
     const linkedPlayer = playerSlugFromSourceUrl(node.attrs.href ?? "") ?? playerSlug;
+    const linkedCoach = coachSlugFromSourceUrl(node.attrs.href ?? "") ?? coachSlug;
     for (const child of node.children) {
       if (typeof child === "string") {
         const text = cleanHtmlText(child);
@@ -2186,10 +2222,11 @@ function collectTeamBlocks(
             type: "text",
             text,
             ...(linkedPlayer ? { playerSlug: linkedPlayer } : {}),
+            ...(linkedCoach ? { coachSlug: linkedCoach } : {}),
           });
         }
       } else {
-        collectTeamBlocks(child, blocks, excludedHeading, linkedPlayer);
+        collectTeamBlocks(child, blocks, excludedHeading, linkedPlayer, linkedCoach);
       }
     }
     return;
@@ -2199,6 +2236,7 @@ function collectTeamBlocks(
     const rows: string[][] = [];
     const headers: string[] = [];
     const playerSlugs: Array<Array<string | null>> = [];
+    const coachSlugs: Array<Array<string | null>> = [];
     const visitRows = (current: TeamHtmlNode) => {
       for (const child of current.children) {
         if (typeof child === "string" || teamNodeHidden(child)) continue;
@@ -2216,6 +2254,9 @@ function collectTeamBlocks(
             playerSlugs.push(
               cellNodes.map((cell) => findLinkedPlayerSlug(cell) ?? playerSlug),
             );
+            coachSlugs.push(
+              cellNodes.map((cell) => findLinkedCoachSlug(cell) ?? coachSlug),
+            );
           }
         } else {
           visitRows(child);
@@ -2225,20 +2266,41 @@ function collectTeamBlocks(
     visitRows(node);
     if (headers.length || rows.length) {
       const hasPlayerLinks = playerSlugs.some((row) => row.some(Boolean));
+      const hasCoachLinks = coachSlugs.some((row) => row.some(Boolean));
       blocks.push({
         type: "table",
         headers,
         rows,
         ...(hasPlayerLinks ? { playerSlugs } : {}),
+        ...(hasCoachLinks ? { coachSlugs } : {}),
       });
     }
-    const collectImages = (current: TeamHtmlNode) => {
+    const collectImages = (
+      current: TeamHtmlNode,
+      inheritedPlayerSlug: string | null = playerSlug,
+      inheritedCoachSlug: string | null = coachSlug,
+    ) => {
+      if (current.tag === "img") {
+        collectTeamBlocks(
+          current,
+          blocks,
+          excludedHeading,
+          inheritedPlayerSlug,
+          inheritedCoachSlug,
+        );
+        return;
+      }
+      const currentPlayerSlug =
+        current.tag === "a"
+          ? playerSlugFromSourceUrl(current.attrs.href ?? "") ?? inheritedPlayerSlug
+          : inheritedPlayerSlug;
+      const currentCoachSlug =
+        current.tag === "a"
+          ? coachSlugFromSourceUrl(current.attrs.href ?? "") ?? inheritedCoachSlug
+          : inheritedCoachSlug;
       for (const child of current.children) {
-        if (typeof child === "string" || teamNodeHidden(child)) continue;
-        if (child.tag === "img") {
-          collectTeamBlocks(child, blocks, excludedHeading, playerSlug);
-        } else {
-          collectImages(child);
+        if (typeof child !== "string" && !teamNodeHidden(child)) {
+          collectImages(child, currentPlayerSlug, currentCoachSlug);
         }
       }
     };
@@ -2254,16 +2316,43 @@ function collectTeamBlocks(
     );
   if (semanticText) {
     const text = teamNodeText(node);
+    const linkedPlayerSlug = playerSlug ?? findLinkedPlayerSlug(node);
+    const linkedCoachSlug = coachSlug ?? findLinkedCoachSlug(node);
     if (text && text !== excludedHeading && !isPageChrome(text)) {
-      blocks.push({ type: "text", text, ...(playerSlug ? { playerSlug } : {}) });
+      blocks.push({
+        type: "text",
+        text,
+        ...(linkedPlayerSlug ? { playerSlug: linkedPlayerSlug } : {}),
+        ...(linkedCoachSlug ? { coachSlug: linkedCoachSlug } : {}),
+      });
     }
-    const collectImages = (current: TeamHtmlNode) => {
+    const collectImages = (
+      current: TeamHtmlNode,
+      inheritedPlayerSlug: string | null = playerSlug,
+      inheritedCoachSlug: string | null = coachSlug,
+    ) => {
       if (current.tag === "img") {
-        collectTeamBlocks(current, blocks, excludedHeading, playerSlug);
+        collectTeamBlocks(
+          current,
+          blocks,
+          excludedHeading,
+          inheritedPlayerSlug,
+          inheritedCoachSlug,
+        );
         return;
       }
+      const currentPlayerSlug =
+        current.tag === "a"
+          ? playerSlugFromSourceUrl(current.attrs.href ?? "") ?? inheritedPlayerSlug
+          : inheritedPlayerSlug;
+      const currentCoachSlug =
+        current.tag === "a"
+          ? coachSlugFromSourceUrl(current.attrs.href ?? "") ?? inheritedCoachSlug
+          : inheritedCoachSlug;
       for (const child of current.children) {
-        if (typeof child !== "string") collectImages(child);
+        if (typeof child !== "string") {
+          collectImages(child, currentPlayerSlug, currentCoachSlug);
+        }
       }
     };
     collectImages(node);
@@ -2273,9 +2362,16 @@ function collectTeamBlocks(
   for (const child of node.children) {
     if (typeof child === "string") {
       const text = cleanHtmlText(child);
-      if (text && !isPageChrome(text)) blocks.push({ type: "text", text });
+      if (text && !isPageChrome(text)) {
+        blocks.push({
+          type: "text",
+          text,
+          ...(playerSlug ? { playerSlug } : {}),
+          ...(coachSlug ? { coachSlug } : {}),
+        });
+      }
     } else {
-      collectTeamBlocks(child, blocks, excludedHeading, playerSlug);
+      collectTeamBlocks(child, blocks, excludedHeading, playerSlug, coachSlug);
     }
   }
 }

@@ -99,6 +99,8 @@ export interface TeamLineup {
   formation: string | null;
   /** @nullable */
   coach: string | null;
+  /** @nullable */
+  coachSlug: string | null;
   players: LineupPlayer[];
 }
 
@@ -186,6 +188,8 @@ export interface MatchContentBlock {
   rows?: string[][];
   playerSlug?: string;
   playerSlugs?: ((string | null)[])[];
+  coachSlug?: string;
+  coachSlugs?: ((string | null)[])[];
 }
 
 export interface MatchContentSection {

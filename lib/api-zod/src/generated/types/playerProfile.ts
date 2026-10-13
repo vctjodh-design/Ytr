@@ -16,7 +16,7 @@ export interface PlayerProfile {
   /** @nullable */
   nationalityFlagUrl: string | null;
   /** @nullable */
-  birthDate: Date | null;
+  birthDate: string | null;
   /** @nullable */
   age: number | null;
   /** @nullable */

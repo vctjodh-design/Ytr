@@ -153,6 +153,7 @@ export const GetMatchDetailsResponse = zod.object({
   "team": zod.string(),
   "formation": zod.string().nullable(),
   "coach": zod.string().nullable(),
+  "coachSlug": zod.string().nullable(),
   "players": zod.array(zod.object({
   "name": zod.string(),
   "number": zod.number().int().nullable(),
@@ -195,7 +196,9 @@ export const GetMatchDetailsResponse = zod.object({
   "headers": zod.array(zod.string()).optional(),
   "rows": zod.array(zod.array(zod.string())).optional(),
   "playerSlug": zod.string().optional(),
-  "playerSlugs": zod.array(zod.array(zod.string().nullable())).optional()
+  "playerSlugs": zod.array(zod.array(zod.string().nullable())).optional(),
+  "coachSlug": zod.string().optional(),
+  "coachSlugs": zod.array(zod.array(zod.string().nullable())).optional()
 })).optional()
 }))
 }))
@@ -281,7 +284,9 @@ export const GetTeamDetailsResponse = zod.object({
   "headers": zod.array(zod.string()).optional(),
   "rows": zod.array(zod.array(zod.string())).optional(),
   "playerSlug": zod.string().optional(),
-  "playerSlugs": zod.array(zod.array(zod.string().nullable())).optional()
+  "playerSlugs": zod.array(zod.array(zod.string().nullable())).optional(),
+  "coachSlug": zod.string().optional(),
+  "coachSlugs": zod.array(zod.array(zod.string().nullable())).optional()
 })).optional()
 }))
 }))
@@ -305,7 +310,7 @@ export const GetPlayerDetailsResponse = zod.object({
   "photoUrl": zod.string().url().nullable(),
   "nationality": zod.string().nullable(),
   "nationalityFlagUrl": zod.string().url().nullable(),
-  "birthDate": zod.coerce.date().nullable(),
+  "birthDate": zod.string().nullable(),
   "age": zod.number().int().nullable(),
   "heightCm": zod.number().int().nullable(),
   "weightKg": zod.number().int().nullable(),
@@ -336,7 +341,9 @@ export const GetPlayerDetailsResponse = zod.object({
   "headers": zod.array(zod.string()).optional(),
   "rows": zod.array(zod.array(zod.string())).optional(),
   "playerSlug": zod.string().optional(),
-  "playerSlugs": zod.array(zod.array(zod.string().nullable())).optional()
+  "playerSlugs": zod.array(zod.array(zod.string().nullable())).optional(),
+  "coachSlug": zod.string().optional(),
+  "coachSlugs": zod.array(zod.array(zod.string().nullable())).optional()
 })).optional()
 }))
 }))

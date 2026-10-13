@@ -64,6 +64,17 @@ export function MatchSourceContent({ page, tab }: { page?: SourcePage; tab: stri
                         >
                           {figure}
                         </Link>
+                      ) : block.coachSlug ? (
+                        <a
+                          className="source-coach-image-link"
+                          href={`https://www.besoccer.com/coach/${encodeURIComponent(block.coachSlug)}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          aria-label={`Open ${block.imageAlt || 'coach'} BeSoccer profile`}
+                          key={`image-${blockIndex}`}
+                        >
+                          {figure}
+                        </a>
                       ) : figure;
                     }
                     if (block.type === 'table') {
@@ -78,12 +89,22 @@ export function MatchSourceContent({ page, tab }: { page?: SourcePage; tab: stri
                                 <tr key={`row-${rowIndex}`}>
                                   {row.map((value, cellIndex) => {
                                     const playerSlug = block.playerSlugs?.[rowIndex]?.[cellIndex];
+                                    const coachSlug = block.coachSlugs?.[rowIndex]?.[cellIndex];
                                     return (
                                       <td key={`${cellIndex}-${value}`}>
                                         {playerSlug ? (
                                           <Link href={`/player/${encodeURIComponent(playerSlug)}`} className="source-player-link">
                                             {value}
                                           </Link>
+                                        ) : coachSlug ? (
+                                          <a
+                                            href={`https://www.besoccer.com/coach/${encodeURIComponent(coachSlug)}`}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="source-coach-link"
+                                          >
+                                            {value}
+                                          </a>
                                         ) : value}
                                       </td>
                                     );
@@ -101,6 +122,15 @@ export function MatchSourceContent({ page, tab }: { page?: SourcePage; tab: stri
                           <Link href={`/player/${encodeURIComponent(block.playerSlug)}`} className="source-player-link">
                             {block.text}
                           </Link>
+                        ) : block.coachSlug ? (
+                          <a
+                            href={`https://www.besoccer.com/coach/${encodeURIComponent(block.coachSlug)}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="source-coach-link"
+                          >
+                            {block.text}
+                          </a>
                         ) : block.text}
                       </p>
                     ) : null;

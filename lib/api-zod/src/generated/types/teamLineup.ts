@@ -13,5 +13,7 @@ export interface TeamLineup {
   formation: string | null;
   /** @nullable */
   coach: string | null;
+  /** @nullable */
+  coachSlug: string | null;
   players: LineupPlayer[];
 }

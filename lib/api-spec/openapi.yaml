@@ -363,11 +363,13 @@ components:
           type: ["string", "null"]
         coach:
           type: ["string", "null"]
+        coachSlug:
+          type: ["string", "null"]
         players:
           type: array
           items:
             $ref: "#/components/schemas/LineupPlayer"
-      required: [team, formation, coach, players]
+      required: [team, formation, coach, coachSlug, players]
     MatchEvent:
       type: object
       properties:
@@ -521,6 +523,14 @@ components:
         playerSlug:
           type: string
         playerSlugs:
+          type: array
+          items:
+            type: array
+            items:
+              type: ["string", "null"]
+        coachSlug:
+          type: string
+        coachSlugs:
           type: array
           items:
             type: array
