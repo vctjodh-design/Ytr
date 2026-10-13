@@ -7,7 +7,6 @@ import { BrandMark } from '@/components/brand-mark';
 import { TeamCrest } from '@/components/team-crest';
 import { FixtureRow, FixtureSkeleton } from '@/components/fixture-row';
 import { SectionEmpty } from '@/components/section-empty';
-import { MatchSourceContent } from '@/components/match-source-content';
 import { OddsPanel } from '@/components/odds-panel';
 
 const tabs = ['Rounds', 'Standings', 'Analysis', 'Preview', 'Lineups', 'Odds', 'Events'] as const;
@@ -110,7 +109,6 @@ export default function MatchPage() {
             <section className="match-data-panel" key={tab}>
               <div className="data-panel-head"><div><p className="eyebrow"><span className="eyebrow-mark">{String(tabs.indexOf(tab) + 1).padStart(2, '0')}</span> MATCH INTELLIGENCE</p><h2>{tab}<em>{tab === 'Rounds' ? ' around it.' : tab === 'Standings' ? ' table.' : tab === 'Lineups' ? ' sheet.' : tab === 'Analysis' ? ' desk.' : tab === 'Preview' ? ' notes.' : tab === 'Events' ? ' log.' : ' market.'}</em></h2></div><span className="data-source">{tab.toUpperCase()} / SOURCE DATA</span></div>
               <TabContent tab={tab} details={data} matchId={matchId} sourcePath={requestParams?.sourcePath} selectedDate={fixture.kickoff.slice(0, 10)} />
-              {tab !== 'Odds' && <MatchSourceContent page={data.sourcePages?.find((page) => page.tab.trim().toLowerCase() === tab.toLowerCase())} tab={tab} />}
             </section>
             <footer className="page-foot match-foot"><span>TOUCHLINE DESK <b>·</b> {fixture.id}</span><span>{data.fetchedAt ? `SOURCE CAPTURED ${new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(data.fetchedAt))}` : 'SOURCE CAPTURE TIME NOT PROVIDED'}<a href={data.sourceUrl || fixture.sourceUrl} target="_blank" rel="noreferrer" aria-label="Open original match source"><ExternalLink size={12} /></a></span></footer>
           </>

@@ -257,6 +257,12 @@ function parseFixtureCards(
     const marker = card.match(
       /<div\b(?=[^>]*\bdates\b)[^>]*>([\s\S]*?)<\/div>/i,
     )?.[1];
+    const scoreMarker = card.match(
+      /<div\b(?=[^>]*\bmarker\b)[^>]*>([\s\S]*?)<\/div>/i,
+    )?.[1];
+    const score = scoreMarker
+      ? cleanHtmlText(scoreMarker).match(/\b(\d{1,2})\s*[-–]\s*(\d{1,2})\b/)
+      : null;
     const statusId = htmlAttribute(openingTag, "data-status-id");
     const minute = marker ? cleanHtmlText(marker).match(/\d{1,3}(?:\+\d{1,2})?['’]/)?.[0] : null;
     const status =
@@ -283,8 +289,8 @@ function parseFixtureCards(
       awayBadgeUrl: badges[1]?.src ?? null,
       kickoff: kickoffTime ? `${kickoffDate} ${kickoffTime}` : kickoffDate,
       status,
-      homeScore: null,
-      awayScore: null,
+      homeScore: score ? Number(score[1]) : null,
+      awayScore: score ? Number(score[2]) : null,
     });
     competitionKeys?.set(matchId, getCompetitionKeyAt(competitions, match.index));
   }
@@ -1304,8 +1310,8 @@ export async function listFixturesForDate(date: string): Promise<FixtureList> {
             ...fixture,
             round: textFixture.round,
             status: textFixture.status,
-            homeScore: textFixture.homeScore,
-            awayScore: textFixture.awayScore,
+            homeScore: textFixture.homeScore ?? fixture.homeScore,
+            awayScore: textFixture.awayScore ?? fixture.awayScore,
           }
         : fixture;
     }),
