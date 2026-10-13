@@ -154,3 +154,44 @@ export const GetMatchDetailsResponse = zod.object({
 })
 
 
+/**
+ * @summary Get bookmaker odds for a match market
+ */
+export const getMatchOddsPathMatchIdRegExp = new RegExp('^[0-9]+$');
+
+
+export const GetMatchOddsParams = zod.object({
+  "matchId": zod.coerce.string().regex(getMatchOddsPathMatchIdRegExp)
+})
+
+export const GetMatchOddsQueryParams = zod.object({
+  "marketId": zod.enum(['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']),
+  "sourcePath": zod.coerce.string().optional().describe('Canonical BeSoccer match path copied from the fixture link')
+})
+
+export const GetMatchOddsResponse = zod.object({
+  "marketId": zod.string(),
+  "marketName": zod.string(),
+  "sourceRegion": zod.string().nullable(),
+  "periods": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "columns": zod.array(zod.string()),
+  "groups": zod.array(zod.object({
+  "label": zod.string().nullable(),
+  "bookmakers": zod.array(zod.object({
+  "name": zod.string(),
+  "outcomes": zod.array(zod.object({
+  "label": zod.string(),
+  "price": zod.string().nullable(),
+  "initialPrice": zod.string().nullable(),
+  "movement": zod.string().nullable(),
+  "active": zod.boolean(),
+  "winner": zod.boolean()
+}))
+}))
+}))
+}))
+})
+
+

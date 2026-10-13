@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useGetMatchDetails, getGetMatchDetailsQueryKey } from '@workspace/api-client-react';
-import { ArrowLeft, ArrowUpRight, CircleAlert, ExternalLink, RotateCw } from 'lucide-react';
+import { ArrowLeft, CircleAlert, ExternalLink, RotateCw } from 'lucide-react';
 import { Link, useParams } from 'wouter';
 import type { Fixture, MatchDetails } from '@workspace/api-client-react';
 import { BrandMark } from '@/components/brand-mark';
@@ -8,6 +8,7 @@ import { TeamCrest } from '@/components/team-crest';
 import { FixtureRow, FixtureSkeleton } from '@/components/fixture-row';
 import { SectionEmpty } from '@/components/section-empty';
 import { MatchSourceContent } from '@/components/match-source-content';
+import { OddsPanel } from '@/components/odds-panel';
 
 const tabs = ['Rounds', 'Standings', 'Analysis', 'Preview', 'Lineups', 'Odds', 'Events'] as const;
 type Tab = typeof tabs[number];
@@ -29,7 +30,17 @@ function getState(fixture: Fixture) {
   return fixture.status || 'UPCOMING';
 }
 
-function TabContent({ tab, details }: { tab: Tab; details: MatchDetails }) {
+function TabContent({
+  tab,
+  details,
+  matchId,
+  sourcePath,
+}: {
+  tab: Tab;
+  details: MatchDetails;
+  matchId: string;
+  sourcePath?: string;
+}) {
   if (tab === 'Rounds') {
     const matches = details.roundMatches ?? [];
     return matches.length ? <div className="rounds-content">{matches.map((fixture) => <FixtureRow fixture={fixture} key={fixture.id} />)}</div> : <SectionEmpty title="Round fixtures unavailable" detail="The source did not provide other matches from this round." />;
@@ -56,8 +67,7 @@ function TabContent({ tab, details }: { tab: Tab; details: MatchDetails }) {
     const events = details.events ?? [];
     return events.length ? <div className="event-timeline">{events.map((event, index) => <article className="event-row" key={`${event.minute}-${index}`}><span className="event-minute">{event.minute}'</span><span className="event-marker" /><div><strong>{event.eventType}</strong><p>{[event.player, event.team, event.detail].filter(Boolean).join(' · ') || 'Event detail not supplied'}</p></div></article>)}</div> : <SectionEmpty title="No events recorded" detail="There is no event timeline available for this fixture yet." />;
   }
-  const odds = details.odds ?? [];
-  return odds.length ? <div className="table-scroll"><table className="odds-table"><thead><tr><th>BOOKMAKER</th><th>HOME</th><th>DRAW</th><th>AWAY</th><th>SOURCE</th></tr></thead><tbody>{odds.map((odd, index) => <tr key={`${odd.bookmaker}-${index}`}><td className="bookmaker">{odd.bookmaker}</td><td>{odd.homeOdds ?? '—'}</td><td>{odd.drawOdds ?? '—'}</td><td>{odd.awayOdds ?? '—'}</td><td>{odd.sourceUrl ? <a className="table-source" href={odd.sourceUrl} target="_blank" rel="noreferrer">VIEW <ArrowUpRight size={12} /></a> : '—'}</td></tr>)}</tbody></table></div> : <SectionEmpty title="Odds unavailable" detail="No bookmaker prices were returned for this match." />;
+  return <OddsPanel matchId={matchId} sourcePath={sourcePath} />;
 }
 
 export default function MatchPage() {
@@ -97,8 +107,8 @@ export default function MatchPage() {
             <nav className="match-tabs" aria-label="Match information sections">{tabs.map((item, index) => <button type="button" aria-pressed={tab === item} className={tab === item ? 'match-tab active' : 'match-tab'} key={item} onClick={() => setTab(item)} data-testid={`tab-${item.toLowerCase()}`}><span className="tab-index">{String(index + 1).padStart(2, '0')}</span>{item}</button>)}</nav>
             <section className="match-data-panel" key={tab}>
               <div className="data-panel-head"><div><p className="eyebrow"><span className="eyebrow-mark">{String(tabs.indexOf(tab) + 1).padStart(2, '0')}</span> MATCH INTELLIGENCE</p><h2>{tab}<em>{tab === 'Rounds' ? ' around it.' : tab === 'Standings' ? ' table.' : tab === 'Lineups' ? ' sheet.' : tab === 'Analysis' ? ' desk.' : tab === 'Preview' ? ' notes.' : tab === 'Events' ? ' log.' : ' market.'}</em></h2></div><span className="data-source">{tab.toUpperCase()} / SOURCE DATA</span></div>
-              <TabContent tab={tab} details={data} />
-              <MatchSourceContent page={data.sourcePages?.find((page) => page.tab.trim().toLowerCase() === tab.toLowerCase())} tab={tab} />
+              <TabContent tab={tab} details={data} matchId={matchId} sourcePath={requestParams?.sourcePath} />
+              {tab !== 'Odds' && <MatchSourceContent page={data.sourcePages?.find((page) => page.tab.trim().toLowerCase() === tab.toLowerCase())} tab={tab} />}
             </section>
             <footer className="page-foot match-foot"><span>TOUCHLINE DESK <b>·</b> {fixture.id}</span><span>{data.fetchedAt ? `SOURCE CAPTURED ${new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(data.fetchedAt))}` : 'SOURCE CAPTURE TIME NOT PROVIDED'}<a href={data.sourceUrl || fixture.sourceUrl} target="_blank" rel="noreferrer" aria-label="Open original match source"><ExternalLink size={12} /></a></span></footer>
           </>

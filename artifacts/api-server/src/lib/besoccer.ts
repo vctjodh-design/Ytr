@@ -5,6 +5,7 @@ import type {
   MatchContentPage,
   MatchDetails,
   MatchEvent,
+  MatchOdds,
   MatchStat,
   OddsEntry,
   PreviewFact,
@@ -19,6 +20,10 @@ const pendingRequests = new Map<string, Promise<string>>();
 const knownFixtures = new Map<string, Fixture>();
 const knownMatchPaths = new Map<string, string>();
 const knownCompetitionKeys = new Map<string, string>();
+const knownOddsMatchKeys = new Map<
+  string,
+  { year: string; sourceMatchId: string; sourceRegion: string | null }
+>();
 
 function fromCache<T>(key: string): T | undefined {
   const cached = responseCache.get(key);
@@ -69,11 +74,51 @@ async function getMarkdown(path: string): Promise<string> {
   }
 }
 
+async function getRawHtml(path: string): Promise<string> {
+  const cacheKey = `html:${path}`;
+  const cached = fromCache<string>(cacheKey);
+  if (cached) return cached;
+
+  const pendingKey = `html:${path}`;
+  const pending = pendingRequests.get(pendingKey);
+  if (pending) return pending;
+
+  const request = (async () => {
+    const response = await fetch(`${markdownProxyOrigin}${path}`, {
+      headers: {
+        Accept: "text/html",
+        "User-Agent": "FootballFixturesExplorer/1.0",
+        "X-Respond-With": "html",
+      },
+      signal: AbortSignal.timeout(25_000),
+    });
+    if (!response.ok) {
+      throw new Error(`Source proxy returned HTTP ${response.status}`);
+    }
+
+    const html = await response.text();
+    if (html.length < 80) {
+      throw new Error("The BeSoccer page returned no odds data");
+    }
+    saveCache(cacheKey, html, 90_000);
+    return html;
+  })();
+
+  pendingRequests.set(pendingKey, request);
+  try {
+    return await request;
+  } finally {
+    pendingRequests.delete(pendingKey);
+  }
+}
+
 function decodeEntities(text: string): string {
   return text
     .replace(/&amp;/g, "&")
     .replace(/&#39;|&apos;/g, "'")
     .replace(/&quot;/g, '"')
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
     .replace(/&nbsp;/g, " ");
 }
 
@@ -679,6 +724,185 @@ function parseOdds(markdown: string, sourceUrl: string): OddsEntry[] {
   );
 }
 
+const oddsMarkets = new Map([
+  ["1", "1X2"],
+  ["2", "Over/under"],
+  ["3", "Asian handicap"],
+  ["4", "Both teams to score"],
+  ["5", "Double chance"],
+  ["6", "European handicap"],
+  ["7", "Draw no bet"],
+  ["8", "Correct score"],
+  ["9", "Half time/full time"],
+  ["10", "Odd/even"],
+]);
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function asArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function textValue(value: unknown): string | null {
+  return typeof value === "string"
+    ? decodeEntities(value).replace(/\\\//g, "/").trim() || null
+    : null;
+}
+
+function parseOddsPayload(
+  html: string,
+  marketId: string,
+  sourceRegion: string | null,
+): MatchOdds {
+  const marketName = oddsMarkets.get(marketId);
+  if (!marketName) throw new Error("The selected odds market is not supported");
+  const response: MatchOdds = {
+    marketId,
+    marketName,
+    sourceRegion,
+    periods: [],
+  };
+
+  const dataAttribute = html.match(/\bdata_odds="([^"]*)"/i)?.[1];
+  if (!dataAttribute) {
+    throw new Error("BeSoccer did not return the selected odds market");
+  }
+
+  const normalizedJson = decodeEntities(
+    dataAttribute.replace(/\\&quot;/g, "&quot;"),
+  ).replace(/(\\+)"/g, (match, slashes: string) =>
+    slashes.length % 2 === 0 ? `${slashes.slice(1)}"` : match,
+  );
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(normalizedJson);
+  } catch {
+    throw new Error("BeSoccer returned odds in an unreadable format");
+  }
+
+  if (Array.isArray(parsed)) {
+    return response;
+  }
+
+  const payload = asRecord(parsed);
+  const scopeInfo = asRecord(payload?.scopesInfo);
+  const scopes = asRecord(payload?.scopes);
+  if (!scopeInfo || !scopes) return response;
+
+  for (const [periodId, rawInfo] of Object.entries(scopeInfo)) {
+    const info = asRecord(rawInfo);
+    if (!info) continue;
+
+    const columns = asArray(info.columns)
+      .map((column) => {
+        const record = asRecord(column);
+        return textValue(record?.name) ?? textValue(record?.id);
+      })
+      .filter((column): column is string => Boolean(column));
+    const groups = asArray(scopes[periodId]).flatMap((rawGroup) => {
+      const group = asRecord(rawGroup);
+      if (!group) return [];
+      const bookmakers = asArray(group.housesOdds).flatMap((rawBookmaker) => {
+        const bookmaker = asRecord(rawBookmaker);
+        if (!bookmaker) return [];
+        const name =
+          textValue(bookmaker.houseName) ??
+          textValue(bookmaker.bsHouseName) ??
+          textValue(bookmaker.house);
+        if (!name) return [];
+
+        const outcomes = asArray(bookmaker.bets).flatMap((rawOutcome) => {
+          const outcome = asRecord(rawOutcome);
+          if (!outcome) return [];
+          const column = textValue(outcome.column);
+          if (!column) return [];
+          const columnLabel =
+            columns.find(
+              (value) => value.toLowerCase() === column.toLowerCase(),
+            ) ?? column;
+          return [{
+            label: columnLabel,
+            price: textValue(outcome.value),
+            initialPrice: textValue(outcome.initialValue),
+            movement: textValue(outcome.direction),
+            active: outcome.active === true,
+            winner: outcome.winner === true,
+          }];
+        });
+        return outcomes.length ? [{ name, outcomes }] : [];
+      });
+      return bookmakers.length
+        ? [{ label: textValue(group.oddName), bookmakers }]
+        : [];
+    });
+
+    if (groups.length) {
+      response.periods.push({
+        id: periodId,
+        name: textValue(info.description) ?? textValue(info.name) ?? periodId,
+        columns,
+        groups,
+      });
+    }
+  }
+
+  return response;
+}
+
+function parseOddsMatchKey(
+  html: string,
+): { year: string; sourceMatchId: string; sourceRegion: string | null } | null {
+  const filterTag = html.match(/<[^>]+\bid=["']filterBets["'][^>]*>/i)?.[0];
+  if (!filterTag) return null;
+  const sourceMatchId = filterTag.match(/\bdata-matchid=["']([^"']+)["']/i)?.[1];
+  const year = filterTag.match(/\bdata-year=["']([^"']+)["']/i)?.[1];
+  const sourceRegion = html.match(
+    /<body\b[^>]*\bdata-iso-code=["']([a-z]{2})["']/i,
+  )?.[1]?.toUpperCase() ?? null;
+  return sourceMatchId && year ? { sourceMatchId, year, sourceRegion } : null;
+}
+
+export async function getMatchOdds(
+  matchId: string,
+  marketId: string,
+  requestedPath?: string,
+): Promise<MatchOdds> {
+  const cacheKey = `match-odds:${matchId}:${marketId}`;
+  const cached = fromCache<MatchOdds>(cacheKey);
+  if (cached) return cached;
+
+  const matchPath = sourcePathForMatch(matchId, requestedPath);
+  const oddsPath = `${matchPath}/odds`;
+  let matchKey = knownOddsMatchKeys.get(matchId);
+  if (!matchKey) {
+    const oddsHtml = await getRawHtml(oddsPath);
+    const parsedMatchKey = parseOddsMatchKey(oddsHtml);
+    if (!parsedMatchKey) {
+      throw new Error("BeSoccer did not include the internal match key for odds");
+    }
+    matchKey = parsedMatchKey;
+    knownOddsMatchKeys.set(matchId, matchKey);
+  }
+
+  if (!matchKey) {
+    throw new Error("BeSoccer did not include the internal match key for odds");
+  }
+
+  const filterPath =
+    `/ajax/betsFilter?filter=${encodeURIComponent(marketId)}` +
+    `%26year=${encodeURIComponent(matchKey.year)}` +
+    `%26matchId=${encodeURIComponent(matchKey.sourceMatchId)}`;
+  const sourceHtml = await getRawHtml(filterPath);
+  const result = parseOddsPayload(sourceHtml, marketId, matchKey.sourceRegion);
+  saveCache(cacheKey, result, 60_000);
+  return result;
+}
+
 const sourcePageTabs = [
   "rounds",
   "table",
@@ -950,10 +1174,11 @@ export async function getMatchById(
     if (dateResult.status !== "fulfilled") continue;
     for (const candidate of dateResult.value.fixtures) {
       const candidateCompetitionKey = knownCompetitionKeys.get(candidate.id);
-      const belongsToCompetition = sourceCompetitionKey
-        ? candidateCompetitionKey === sourceCompetitionKey
-        : normalizeCompetition(candidate.competition) ===
-          normalizeCompetition(fixture.competition);
+      const belongsToCompetition =
+        sourceCompetitionKey && candidateCompetitionKey
+          ? candidateCompetitionKey === sourceCompetitionKey
+          : normalizeCompetition(candidate.competition) ===
+            normalizeCompetition(fixture.competition);
       if (belongsToCompetition) {
         roundFixturesById.set(candidate.id, {
           ...candidate,

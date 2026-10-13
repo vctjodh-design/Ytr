@@ -3,10 +3,14 @@ import {
   GetMatchDetailsParams,
   GetMatchDetailsQueryParams,
   GetMatchDetailsResponse,
+  GetMatchOddsParams,
+  GetMatchOddsQueryParams,
+  GetMatchOddsResponse,
   ListFixturesResponse,
 } from "@workspace/api-zod";
 import {
   getMatchById,
+  getMatchOdds,
   isValidDate,
   listFixturesForDate,
 } from "../lib/besoccer";
@@ -26,6 +30,35 @@ router.get("/fixtures", async (req, res): Promise<void> => {
   } catch (error) {
     req.log.error({ err: error, date }, "Unable to load fixtures");
     res.status(502).json({ error: "Fixture data is temporarily unavailable." });
+  }
+});
+
+router.get("/matches/:matchId/odds", async (req, res): Promise<void> => {
+  const params = GetMatchOddsParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: "A valid match id is required." });
+    return;
+  }
+
+  const query = GetMatchOddsQueryParams.safeParse(req.query);
+  if (!query.success) {
+    res.status(400).json({ error: "A valid odds market is required." });
+    return;
+  }
+
+  try {
+    const odds = await getMatchOdds(
+      params.data.matchId,
+      query.data.marketId,
+      query.data.sourcePath,
+    );
+    res.json(GetMatchOddsResponse.parse(odds));
+  } catch (error) {
+    req.log.error(
+      { err: error, matchId: params.data.matchId, marketId: query.data.marketId },
+      "Unable to load match odds",
+    );
+    res.status(502).json({ error: "Odds data is temporarily unavailable." });
   }
 });
 

@@ -19,9 +19,11 @@ import type {
   ErrorResponse,
   FixtureList,
   GetMatchDetailsParams,
+  GetMatchOddsParams,
   HealthStatus,
   ListFixturesParams,
-  MatchDetails
+  MatchDetails,
+  MatchOdds
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -290,6 +292,95 @@ export function useGetMatchDetails<TData = Awaited<ReturnType<typeof getMatchDet
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetMatchDetailsQueryOptions(matchId,params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetMatchOddsUrl = (matchId: string,
+    params: GetMatchOddsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/matches/${matchId}/odds?${stringifiedParams}` : `/api/matches/${matchId}/odds`
+}
+
+/**
+ * @summary Get bookmaker odds for a match market
+ */
+export const getMatchOdds = async (matchId: string,
+    params: GetMatchOddsParams, options?: Parameters<typeof customFetch>[1]): Promise<MatchOdds> => {
+
+  return customFetch<MatchOdds>(getGetMatchOddsUrl(matchId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMatchOddsQueryKey = (matchId: string,
+    params?: GetMatchOddsParams,) => {
+    return [
+    `/api/matches/${matchId}/odds`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetMatchOddsQueryOptions = <TData = Awaited<ReturnType<typeof getMatchOdds>>, TError = ErrorType<ErrorResponse>>(matchId: string,
+    params: GetMatchOddsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMatchOdds>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMatchOddsQueryKey(matchId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMatchOdds>>> = ({ signal }) => getMatchOdds(matchId,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: matchId !== null && matchId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMatchOdds>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMatchOddsQueryResult = NonNullable<Awaited<ReturnType<typeof getMatchOdds>>>
+export type GetMatchOddsQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Get bookmaker odds for a match market
+ */
+
+export function useGetMatchOdds<TData = Awaited<ReturnType<typeof getMatchOdds>>, TError = ErrorType<ErrorResponse>>(
+ matchId: string,
+    params: GetMatchOddsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMatchOdds>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMatchOddsQueryOptions(matchId,params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

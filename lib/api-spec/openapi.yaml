@@ -88,6 +88,49 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /matches/{matchId}/odds:
+    get:
+      operationId: getMatchOdds
+      tags: [fixtures]
+      summary: Get bookmaker odds for a match market
+      parameters:
+        - name: matchId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9]+$"
+        - name: marketId
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]
+        - name: sourcePath
+          in: query
+          required: false
+          description: Canonical BeSoccer match path copied from the fixture link
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Bookmaker prices and outcomes for the selected market
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MatchOdds"
+        "404":
+          description: Match not found or unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: BeSoccer odds could not be retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 components:
   schemas:
     HealthStatus:
@@ -281,6 +324,72 @@ components:
           type: ["string", "null"]
           format: uri
       required: [bookmaker, homeOdds, drawOdds, awayOdds, sourceUrl]
+    OddsOutcome:
+      type: object
+      properties:
+        label:
+          type: string
+        price:
+          type: ["string", "null"]
+        initialPrice:
+          type: ["string", "null"]
+        movement:
+          type: ["string", "null"]
+        active:
+          type: boolean
+        winner:
+          type: boolean
+      required: [label, price, initialPrice, movement, active, winner]
+    OddsBookmaker:
+      type: object
+      properties:
+        name:
+          type: string
+        outcomes:
+          type: array
+          items:
+            $ref: "#/components/schemas/OddsOutcome"
+      required: [name, outcomes]
+    OddsGroup:
+      type: object
+      properties:
+        label:
+          type: ["string", "null"]
+        bookmakers:
+          type: array
+          items:
+            $ref: "#/components/schemas/OddsBookmaker"
+      required: [label, bookmakers]
+    OddsPeriod:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        columns:
+          type: array
+          items:
+            type: string
+        groups:
+          type: array
+          items:
+            $ref: "#/components/schemas/OddsGroup"
+      required: [id, name, columns, groups]
+    MatchOdds:
+      type: object
+      properties:
+        marketId:
+          type: string
+        marketName:
+          type: string
+        sourceRegion:
+          type: ["string", "null"]
+        periods:
+          type: array
+          items:
+            $ref: "#/components/schemas/OddsPeriod"
+      required: [marketId, marketName, sourceRegion, periods]
     MatchContentTable:
       type: object
       properties:

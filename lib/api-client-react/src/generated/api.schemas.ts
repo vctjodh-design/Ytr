@@ -119,6 +119,44 @@ export interface OddsEntry {
   sourceUrl: string | null;
 }
 
+export interface OddsOutcome {
+  label: string;
+  /** @nullable */
+  price: string | null;
+  /** @nullable */
+  initialPrice: string | null;
+  /** @nullable */
+  movement: string | null;
+  active: boolean;
+  winner: boolean;
+}
+
+export interface OddsBookmaker {
+  name: string;
+  outcomes: OddsOutcome[];
+}
+
+export interface OddsGroup {
+  /** @nullable */
+  label: string | null;
+  bookmakers: OddsBookmaker[];
+}
+
+export interface OddsPeriod {
+  id: string;
+  name: string;
+  columns: string[];
+  groups: OddsGroup[];
+}
+
+export interface MatchOdds {
+  marketId: string;
+  marketName: string;
+  /** @nullable */
+  sourceRegion: string | null;
+  periods: OddsPeriod[];
+}
+
 export interface MatchContentTable {
   headers: string[];
   rows: string[][];
@@ -160,4 +198,28 @@ export type GetMatchDetailsParams = {
  */
 sourcePath?: string;
 };
+
+export type GetMatchOddsParams = {
+marketId: GetMatchOddsMarketId;
+/**
+ * Canonical BeSoccer match path copied from the fixture link
+ */
+sourcePath?: string;
+};
+
+export type GetMatchOddsMarketId = typeof GetMatchOddsMarketId[keyof typeof GetMatchOddsMarketId];
+
+
+export const GetMatchOddsMarketId = {
+  NUMBER_1: '1',
+  NUMBER_2: '2',
+  NUMBER_3: '3',
+  NUMBER_4: '4',
+  NUMBER_5: '5',
+  NUMBER_6: '6',
+  NUMBER_7: '7',
+  NUMBER_8: '8',
+  NUMBER_9: '9',
+  NUMBER_10: '10',
+} as const;
 
