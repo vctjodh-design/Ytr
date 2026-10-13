@@ -17,6 +17,7 @@ import {
 import { Link, useParams } from 'wouter';
 import { BrandMark } from '@/components/brand-mark';
 import { FixtureRow, FixtureSkeleton } from '@/components/fixture-row';
+import { MatchSourceContent } from '@/components/match-source-content';
 import { OddsPanel } from '@/components/odds-panel';
 import { SectionEmpty } from '@/components/section-empty';
 import { TeamCrest } from '@/components/team-crest';
@@ -394,17 +395,25 @@ function TabContent({
 
   if (tab === 'Preview') {
     const facts = details.previewFacts ?? [];
-    return facts.length ? (
-      <div className="preview-grid">
-        {facts.map((fact, index) => (
-          <article className="preview-fact" key={`${fact.label}-${index}`} data-testid={`preview-fact-${index}`}>
-            <span>{fact.label}</span>
-            <p>{fact.value}</p>
-          </article>
-        ))}
-      </div>
-    ) : (
-      <SectionEmpty title="No preview facts" detail="The source did not include editorial notes or pre-match facts." />
+    const previewPage = details.sourcePages?.find((page) => page.tab === 'preview');
+    return (
+      <>
+        {facts.length > 0 && (
+          <div className="preview-grid">
+            {facts.map((fact, index) => (
+              <article className="preview-fact" key={`${fact.label}-${index}`} data-testid={`preview-fact-${index}`}>
+                <span>{fact.label}</span>
+                <p>{fact.value}</p>
+              </article>
+            ))}
+          </div>
+        )}
+        {previewPage ? (
+          <MatchSourceContent page={previewPage} tab="Preview" />
+        ) : facts.length === 0 ? (
+          <SectionEmpty title="No preview facts" detail="The source did not include editorial notes or pre-match facts." />
+        ) : null}
+      </>
     );
   }
 

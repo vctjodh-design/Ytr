@@ -1325,6 +1325,8 @@ function isPageChrome(line: string): boolean {
     /^copyright/.test(text) ||
     /^play responsibly/.test(text) ||
     /^legal notices and privacy/.test(text) ||
+    /^sign in with google/.test(text) ||
+    /^continuar con facebook/.test(text) ||
     /^login or register$/.test(text) ||
     /^login$/.test(text) ||
     /^register$/.test(text) ||
