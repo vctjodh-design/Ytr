@@ -205,6 +205,16 @@ export interface MatchContentPage {
   sections: MatchContentSection[];
 }
 
+export interface MatchStandingRoundOption {
+  round: number;
+  label: string;
+}
+
+export interface MatchStandingsRound {
+  round: number;
+  standings: StandingRow[];
+}
+
 export interface MatchDetails {
   fixture: Fixture;
   sourceUrl: string;
@@ -213,6 +223,9 @@ export interface MatchDetails {
   standings: StandingRow[];
   homeStandings: StandingRow[];
   awayStandings: StandingRow[];
+  /** @nullable */
+  currentStandingsRound: number | null;
+  standingsRoundOptions: MatchStandingRoundOption[];
   analysisStats: MatchStat[];
   matchStatistics: MatchStat[];
   previewFacts: PreviewFact[];
@@ -364,4 +377,16 @@ export const GetMatchOddsMarketId = {
   NUMBER_9: '9',
   NUMBER_10: '10',
 } as const;
+
+export type GetMatchStandingsByRoundParams = {
+/**
+ * @minimum 1
+ * @maximum 99
+ */
+round: number;
+/**
+ * Canonical BeSoccer match path copied from the fixture link
+ */
+sourcePath?: string;
+};
 

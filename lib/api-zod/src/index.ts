@@ -13,6 +13,8 @@ export type {
   MatchDetails,
   MatchEvent,
   MatchOdds,
+  MatchStandingRoundOption,
+  MatchStandingsRound,
   MatchStat,
   OddsBookmaker,
   OddsEntry,

@@ -6,6 +6,7 @@ import type {
   MatchDetails,
   MatchEvent,
   MatchOdds,
+  MatchStandingsRound,
   MatchStat,
   OddsEntry,
   PlayerContentPage,
@@ -720,45 +721,139 @@ function parseRound(markdown: string): {
   return { competition: "Football", round: null };
 }
 
+function normalizeSourceAssetUrl(value: string | undefined): string | null {
+  if (!value) return null;
+  let candidate = decodeEntities(value)
+    .replace(/%22/gi, "")
+    .replace(/\\/g, "")
+    .trim();
+  candidate = candidate.replace(
+    /^https?:\/\/www\.besoccer\.com\/+/i,
+    "",
+  );
+  const protocol = candidate.match(/^(https?):\/+/i);
+  if (!protocol) {
+    const embeddedProtocol = candidate.search(/https?:\/+/i);
+    if (embeddedProtocol < 0) return null;
+    candidate = candidate.slice(embeddedProtocol);
+  }
+
+  candidate = candidate.replace(
+    /^(https?):\/+([^/]+)([\s\S]*)$/i,
+    (_match, scheme: string, host: string, rest: string) =>
+      `${scheme}://${host}${rest.replace(/\/{2,}/g, "/")}`,
+  );
+  try {
+    const url = new URL(candidate);
+    return url.protocol === "http:" || url.protocol === "https:"
+      ? url.toString()
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 function parseStandings(markdown: string): StandingRow[] {
   const rows: StandingRow[] = [];
-  for (const line of markdown.split("\n")) {
+  const normalized = markdown
+    .replace(/\\n/g, " ")
+    .replace(/\\\//g, "/")
+    .replace(/\\u([0-9a-f]{4})/gi, (_match, code: string) =>
+      String.fromCharCode(Number.parseInt(code, 16)),
+    );
+
+  for (const line of normalized.split("\n")) {
     if (!line.trim().startsWith("|")) continue;
     const cells = line
       .split("|")
       .slice(1, -1)
       .map((cell) => cell.trim());
-    if (cells.length < 11 || !/^\d+$/.test(cells[0] ?? "")) continue;
+    if (cells.length < 11) continue;
 
-    const position = parseNumber(cells[0]) ?? 0;
-    const teamLink = cells[2]?.match(/\[([^\]]+)\]\(/);
-    const team = cleanMarkdown(teamLink?.[1] ?? cells[2] ?? "");
+    const position = parseNumber(cleanHtmlText(cells[0] ?? ""));
+    if (position === null) continue;
+    const teamLink = cells[2]?.match(/\[([\s\S]+?)\]\(([^)]+)\)/);
+    const teamSpan = cells[2]?.match(/\[\s*([\s\S]*?)<\/span>/i);
+    const team = cleanMarkdown(teamSpan?.[1] ?? teamLink?.[1] ?? cells[2] ?? "");
     const teamSlug =
       cells[2]?.match(
-        /(?:https?:\/\/(?:www\.)?besoccer\.com)?\/team\/([a-z0-9-]+)/i,
+        /\/team\/+([a-z0-9-]+)/i,
       )?.[1] ?? null;
     if (!team) continue;
 
     const formMatch = cells[2]?.match(/\]\([^)]+\)\s*(.*)$/);
-    const badgeUrl = cells[1]?.match(/!\[[^\]]*\]\(([^)]+)\)/)?.[1] ?? null;
+    const badgeUrl = normalizeSourceAssetUrl(
+      cells[1]?.match(/!\[[^\]]*\]\(([^)]+)\)/)?.[1],
+    );
     rows.push({
       position,
       team,
       teamSlug,
       badgeUrl,
       form: formMatch?.[1] ? cleanMarkdown(formMatch[1]) : null,
-      points: parseNumber(cells[3]),
-      matchesPlayed: parseNumber(cells[4]),
-      wins: parseNumber(cells[5]),
-      draws: parseNumber(cells[6]),
-      losses: parseNumber(cells[7]),
-      goalsFor: parseNumber(cells[8]),
-      goalsAgainst: parseNumber(cells[9]),
-      goalDifference: parseNumber(cells[10]),
+      points: parseNumber(cleanHtmlText(cells[3])),
+      matchesPlayed: parseNumber(cleanHtmlText(cells[4])),
+      wins: parseNumber(cleanHtmlText(cells[5])),
+      draws: parseNumber(cleanHtmlText(cells[6])),
+      losses: parseNumber(cleanHtmlText(cells[7])),
+      goalsFor: parseNumber(cleanHtmlText(cells[8])),
+      goalsAgainst: parseNumber(cleanHtmlText(cells[9])),
+      goalDifference: parseNumber(cleanHtmlText(cells[10])),
     });
-    if (rows.length >= 20) break;
+    if (rows.length >= 64) break;
   }
   return rows;
+}
+
+function parseStandingsPage(
+  html: string,
+): {
+  currentRound: number | null;
+  options: Array<{ round: number; label: string }>;
+  sourceParams: {
+    type: string;
+    itemId: string;
+    competitionId: string;
+    year: string;
+    group: string;
+  } | null;
+} {
+  const tableTag = html.match(
+    /<div\b(?=[^>]*\bid=["']classificationTables["'])[^>]*>/i,
+  )?.[0];
+  const tableAttributes = tableTag ? parseHtmlAttributes(tableTag) : {};
+  const select = html.match(
+    /<select\b(?=[^>]*\bdata-cy=["']roundSelect["'])[^>]*>([\s\S]*?)<\/select>/i,
+  )?.[1] ?? "";
+  const options = Array.from(
+    select.matchAll(/<option\b([^>]*)>([\s\S]*?)<\/option>/gi),
+    (match) => {
+      const optionTag = `<option ${match[1] ?? ""}>`;
+      const round = parseNumber(htmlAttribute(optionTag, "value") ?? undefined);
+      const sourceLabel = cleanHtmlText(match[2] ?? "");
+      if (round === null) return null;
+      const label = sourceLabel.replace(/^Matchday\s+/i, "Round ");
+      return { round, label: label || `Round ${round}` };
+    },
+  ).filter(
+    (option): option is { round: number; label: string } => option !== null,
+  );
+
+  const type = tableAttributes["data-type"];
+  const itemId = tableAttributes["data-item"];
+  const competitionId = tableAttributes["data-competition"];
+  const year = tableAttributes["data-year"];
+  const group = tableAttributes["data-group"];
+  const sourceParams =
+    type && itemId && competitionId && year && group
+      ? { type, itemId, competitionId, year, group }
+      : null;
+
+  return {
+    currentRound: parseNumber(tableAttributes["data-round"]),
+    options,
+    sourceParams,
+  };
 }
 
 function parseStandingRowsFromHtml(
@@ -830,7 +925,7 @@ function parseStandingRowsFromHtml(
       goalsAgainst: parseNumber(cleanHtmlText(cells[9] ?? "")),
       goalDifference: parseNumber(cleanHtmlText(cells[10] ?? "")),
     });
-    if (rows.length >= 20) break;
+    if (rows.length >= 64) break;
   }
 
   return rows;
@@ -1768,17 +1863,22 @@ export async function getMatchById(
     ).values(),
   );
   const parsedStandings = parseStandings(tableMarkdown ?? "");
+  const parsedHtmlStandings = parseStandingRowsFromHtml(
+    tableHtml,
+    "tab_total0",
+  );
+  const standingsPage = parseStandingsPage(tableHtml);
   const result: MatchDetails = {
     fixture,
     sourceUrl: `${besoccerOrigin}${matchPath}`,
     fetchedAt: new Date(),
     roundMatches,
     standings:
-      parsedStandings.length > 0
-        ? parsedStandings
-        : parseStandingRowsFromHtml(tableHtml, "tab_total0"),
+      parsedHtmlStandings.length > 0 ? parsedHtmlStandings : parsedStandings,
     homeStandings: parseStandingRowsFromHtml(tableHtml, "tab_local0"),
     awayStandings: parseStandingRowsFromHtml(tableHtml, "tab_visitor0"),
+    currentStandingsRound: standingsPage.currentRound,
+    standingsRoundOptions: standingsPage.options,
     analysisStats: parseAnalysis(analysisMarkdown ?? ""),
     matchStatistics: parseMatchStatistics(eventMarkdown ?? ""),
     previewFacts: parsePreview(
@@ -1801,6 +1901,35 @@ export async function getMatchById(
   };
   saveCache(matchCacheKey, result, 120_000);
   return result;
+}
+
+export async function getMatchStandingsByRound(
+  matchId: string,
+  round: number,
+  requestedPath?: string,
+): Promise<MatchStandingsRound> {
+  const matchPath = sourcePathForMatch(matchId, requestedPath);
+  const tableHtml = await getRawHtml(`${matchPath}/table`);
+  const standingsPage = parseStandingsPage(tableHtml);
+  const sourceParams = standingsPage.sourceParams;
+  if (!sourceParams) {
+    throw new Error("The match does not expose round-specific standings");
+  }
+  if (!standingsPage.options.some((option) => option.round === round)) {
+    throw new Error("Standings are unavailable for the selected round");
+  }
+
+  const query = new URLSearchParams({
+    ...sourceParams,
+    round: String(round),
+  });
+  const markdown = await getMarkdown(`/ajax/reloadTable?${query.toString()}`);
+  const standings = parseStandings(markdown);
+  if (!standings.length) {
+    throw new Error("Standings are unavailable for the selected round");
+  }
+
+  return { round, standings };
 }
 
 const teamPageSources: Array<{

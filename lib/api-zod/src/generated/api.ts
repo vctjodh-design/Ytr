@@ -135,6 +135,11 @@ export const GetMatchDetailsResponse = zod.object({
   "goalsAgainst": zod.number().int().nullable(),
   "goalDifference": zod.number().int().nullable()
 })),
+  "currentStandingsRound": zod.number().int().nullable(),
+  "standingsRoundOptions": zod.array(zod.object({
+  "round": zod.number().int(),
+  "label": zod.string()
+})),
   "analysisStats": zod.array(zod.object({
   "label": zod.string(),
   "homeValue": zod.string(),
@@ -242,6 +247,45 @@ export const GetMatchOddsResponse = zod.object({
 }))
 }))
 }))
+}))
+})
+
+
+/**
+ * @summary Get standings for a selected match round
+ */
+export const getMatchStandingsByRoundPathMatchIdRegExp = new RegExp('^[0-9]+$');
+
+
+export const GetMatchStandingsByRoundParams = zod.object({
+  "matchId": zod.coerce.string().regex(getMatchStandingsByRoundPathMatchIdRegExp)
+})
+
+export const getMatchStandingsByRoundQueryRoundMax = 99;
+
+
+
+export const GetMatchStandingsByRoundQueryParams = zod.object({
+  "round": zod.coerce.number().int().min(1).max(getMatchStandingsByRoundQueryRoundMax),
+  "sourcePath": zod.coerce.string().optional().describe('Canonical BeSoccer match path copied from the fixture link')
+})
+
+export const GetMatchStandingsByRoundResponse = zod.object({
+  "round": zod.number().int(),
+  "standings": zod.array(zod.object({
+  "position": zod.number().int(),
+  "team": zod.string(),
+  "teamSlug": zod.string().nullable(),
+  "badgeUrl": zod.string().url().nullable(),
+  "form": zod.string().nullable(),
+  "points": zod.number().int().nullable(),
+  "matchesPlayed": zod.number().int().nullable(),
+  "wins": zod.number().int().nullable(),
+  "draws": zod.number().int().nullable(),
+  "losses": zod.number().int().nullable(),
+  "goalsFor": zod.number().int().nullable(),
+  "goalsAgainst": zod.number().int().nullable(),
+  "goalDifference": zod.number().int().nullable()
 }))
 })
 

@@ -20,10 +20,12 @@ import type {
   FixtureList,
   GetMatchDetailsParams,
   GetMatchOddsParams,
+  GetMatchStandingsByRoundParams,
   HealthStatus,
   ListFixturesParams,
   MatchDetails,
   MatchOdds,
+  MatchStandingsRound,
   PlayerDetails,
   TeamDetails
 } from './api.schemas';
@@ -383,6 +385,95 @@ export function useGetMatchOdds<TData = Awaited<ReturnType<typeof getMatchOdds>>
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetMatchOddsQueryOptions(matchId,params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetMatchStandingsByRoundUrl = (matchId: string,
+    params: GetMatchStandingsByRoundParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/matches/${matchId}/standings?${stringifiedParams}` : `/api/matches/${matchId}/standings`
+}
+
+/**
+ * @summary Get standings for a selected match round
+ */
+export const getMatchStandingsByRound = async (matchId: string,
+    params: GetMatchStandingsByRoundParams, options?: Parameters<typeof customFetch>[1]): Promise<MatchStandingsRound> => {
+
+  return customFetch<MatchStandingsRound>(getGetMatchStandingsByRoundUrl(matchId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMatchStandingsByRoundQueryKey = (matchId: string,
+    params?: GetMatchStandingsByRoundParams,) => {
+    return [
+    `/api/matches/${matchId}/standings`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetMatchStandingsByRoundQueryOptions = <TData = Awaited<ReturnType<typeof getMatchStandingsByRound>>, TError = ErrorType<ErrorResponse>>(matchId: string,
+    params: GetMatchStandingsByRoundParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMatchStandingsByRound>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMatchStandingsByRoundQueryKey(matchId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMatchStandingsByRound>>> = ({ signal }) => getMatchStandingsByRound(matchId,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: matchId !== null && matchId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMatchStandingsByRound>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMatchStandingsByRoundQueryResult = NonNullable<Awaited<ReturnType<typeof getMatchStandingsByRound>>>
+export type GetMatchStandingsByRoundQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Get standings for a selected match round
+ */
+
+export function useGetMatchStandingsByRound<TData = Awaited<ReturnType<typeof getMatchStandingsByRound>>, TError = ErrorType<ErrorResponse>>(
+ matchId: string,
+    params: GetMatchStandingsByRoundParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMatchStandingsByRound>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMatchStandingsByRoundQueryOptions(matchId,params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

@@ -135,6 +135,56 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /matches/{matchId}/standings:
+    get:
+      operationId: getMatchStandingsByRound
+      tags: [fixtures]
+      summary: Get standings for a selected match round
+      parameters:
+        - name: matchId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9]+$"
+        - name: round
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 99
+        - name: sourcePath
+          in: query
+          required: false
+          description: Canonical BeSoccer match path copied from the fixture link
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Standings snapshot for the selected round
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MatchStandingsRound"
+        "400":
+          description: Match id or round is invalid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Standings are unavailable for the selected round
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: BeSoccer standings could not be retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /teams/{teamSlug}:
     get:
       operationId: getTeamDetails
@@ -550,6 +600,24 @@ components:
           items:
             $ref: "#/components/schemas/MatchContentSection"
       required: [tab, sourceUrl, sections]
+    MatchStandingRoundOption:
+      type: object
+      properties:
+        round:
+          type: integer
+        label:
+          type: string
+      required: [round, label]
+    MatchStandingsRound:
+      type: object
+      properties:
+        round:
+          type: integer
+        standings:
+          type: array
+          items:
+            $ref: "#/components/schemas/StandingRow"
+      required: [round, standings]
     MatchDetails:
       type: object
       properties:
@@ -577,6 +645,12 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/StandingRow"
+        currentStandingsRound:
+          type: ["integer", "null"]
+        standingsRoundOptions:
+          type: array
+          items:
+            $ref: "#/components/schemas/MatchStandingRoundOption"
         analysisStats:
           type: array
           items:
@@ -613,6 +687,8 @@ components:
         - standings
         - homeStandings
         - awayStandings
+        - currentStandingsRound
+        - standingsRoundOptions
         - analysisStats
         - matchStatistics
         - previewFacts

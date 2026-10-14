@@ -2117,6 +2117,33 @@ a {
   gap: 12px;
 }
 
+.standings-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.standings-round-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #81877e;
+  font: 500 9px var(--mono);
+  letter-spacing: .08em;
+}
+
+.standings-round-control select {
+  min-height: 36px;
+  min-width: 126px;
+  padding: 0 32px 0 11px;
+  border: 1px solid #d9d5ca;
+  border-radius: 0;
+  background: #f7f4eb;
+  color: #252a30;
+  font: 500 10px var(--mono);
+}
+
 .standings-scope {
   display: inline-flex;
   padding: 3px;
@@ -2562,6 +2589,10 @@ a {
   .standings-toolbar {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .standings-controls {
+    width: 100%;
   }
 
   .standings-scroll {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ArrowLeft,
   ArrowLeftRight,
@@ -9,6 +9,8 @@ import {
 } from 'lucide-react';
 import {
   getGetMatchDetailsQueryKey,
+  getGetMatchStandingsByRoundQueryKey,
+  useGetMatchStandingsByRound,
   useGetMatchDetails,
   type Fixture,
   type MatchDetails,
@@ -112,43 +114,124 @@ function StandingTable({ rows }: { rows: StandingRow[] }) {
   );
 }
 
-function StandingsContent({ details }: { details: MatchDetails }) {
+function StandingsContent({
+  details,
+  matchId,
+  sourcePath,
+}: {
+  details: MatchDetails;
+  matchId: string;
+  sourcePath?: string;
+}) {
   const [scope, setScope] = useState<StandingScope>('overall');
+  const [selectedRound, setSelectedRound] = useState<number | null>(null);
+  useEffect(() => {
+    setSelectedRound(null);
+    setScope('overall');
+  }, [details.fixture.id]);
+
+  const roundOptions = details.standingsRoundOptions ?? [];
+  const activeRound =
+    selectedRound ??
+    details.currentStandingsRound ??
+    roundOptions[0]?.round ??
+    null;
+  const isCurrentRound = activeRound === details.currentStandingsRound;
+  const standingsParams = { round: activeRound ?? 0, sourcePath };
+  const roundQuery = useGetMatchStandingsByRound(
+    matchId,
+    standingsParams,
+    {
+      query: {
+        queryKey: getGetMatchStandingsByRoundQueryKey(matchId, standingsParams),
+        enabled: Boolean(activeRound && !isCurrentRound),
+        staleTime: 5 * 60_000,
+        retry: 1,
+      },
+    },
+  );
+  const overallRows = isCurrentRound
+    ? details.standings ?? []
+    : roundQuery.data?.standings ?? [];
   const rowsByScope = {
-    overall: details.standings ?? [],
-    home: details.homeStandings ?? [],
-    away: details.awayStandings ?? [],
+    overall: overallRows,
+    home: isCurrentRound ? details.homeStandings ?? [] : [],
+    away: isCurrentRound ? details.awayStandings ?? [] : [],
   };
   const labels: { id: StandingScope; label: string }[] = [
     { id: 'overall', label: 'Overall' },
     { id: 'home', label: 'Home' },
     { id: 'away', label: 'Away' },
   ];
-  const rows = rowsByScope[scope];
+  const availableLabels = isCurrentRound ? labels : labels.slice(0, 1);
+  const rows = rowsByScope[scope] ?? [];
+  const isRoundLoading = !isCurrentRound && roundQuery.isLoading;
+  const isRoundError = !isCurrentRound && roundQuery.isError;
 
   return (
     <div className="standings-content">
       <div className="standings-toolbar">
-        <div className="standings-scope" role="tablist" aria-label="Standings split">
-          {labels.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              role="tab"
-              aria-selected={scope === item.id}
-              className={`standings-scope-button ${scope === item.id ? 'active' : ''}`}
-              onClick={() => setScope(item.id)}
-              data-testid={`standings-${item.id}`}
-            >
-              {item.label}
-            </button>
-          ))}
+        <div className="standings-controls">
+          {roundOptions.length > 0 && (
+            <label className="standings-round-control">
+              <span>ROUND</span>
+              <select
+                aria-label="Select standings round"
+                data-testid="standings-round-selector"
+                value={activeRound ?? ''}
+                onChange={(event) => {
+                  const nextRound = Number(event.currentTarget.value);
+                  setScope('overall');
+                  setSelectedRound(Number.isFinite(nextRound) ? nextRound : null);
+                }}
+              >
+                {roundOptions.map((option) => (
+                  <option key={option.round} value={option.round}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {availableLabels.length > 1 && (
+            <div className="standings-scope" role="tablist" aria-label="Standings split">
+              {availableLabels.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={scope === item.id}
+                  className={`standings-scope-button ${scope === item.id ? 'active' : ''}`}
+                  onClick={() => setScope(item.id)}
+                  data-testid={`standings-${item.id}`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <span className="standings-caption">
-          {rows.length ? `${rows.length} source rows` : 'No source rows'}
+          {isRoundLoading
+            ? `Loading ${roundOptions.find((option) => option.round === activeRound)?.label ?? 'round'}…`
+            : isRoundError
+              ? 'Round data unavailable'
+              : rows.length
+                ? `${rows.length} teams · ${roundOptions.find((option) => option.round === activeRound)?.label ?? 'current table'}`
+                : 'No source rows'}
         </span>
       </div>
-      {rows.length ? (
+      {isRoundLoading ? (
+        <SectionEmpty
+          title="Loading round standings"
+          detail="Fetching the table snapshot for this round."
+        />
+      ) : isRoundError ? (
+        <SectionEmpty
+          title="Standings unavailable"
+          detail="The source did not return a table for this round."
+        />
+      ) : rows.length ? (
         <StandingTable rows={rows} />
       ) : (
         <SectionEmpty
@@ -404,7 +487,7 @@ function TabContent({
   }
 
   if (tab === 'Standings') {
-    return <StandingsContent details={details} />;
+    return <StandingsContent details={details} matchId={matchId} sourcePath={sourcePath} />;
   }
 
   if (tab === 'Lineups') {

@@ -6,11 +6,15 @@ import {
   GetMatchOddsParams,
   GetMatchOddsQueryParams,
   GetMatchOddsResponse,
+  GetMatchStandingsByRoundParams,
+  GetMatchStandingsByRoundQueryParams,
+  GetMatchStandingsByRoundResponse,
   ListFixturesResponse,
 } from "@workspace/api-zod";
 import {
   getMatchById,
   getMatchOdds,
+  getMatchStandingsByRound,
   isValidDate,
   listFixturesForDate,
 } from "../lib/besoccer";
@@ -60,6 +64,43 @@ router.get("/matches/:matchId/odds", async (req, res): Promise<void> => {
       "Unable to load match odds",
     );
     res.status(502).json({ error: "Odds data is temporarily unavailable." });
+  }
+});
+
+router.get("/matches/:matchId/standings", async (req, res): Promise<void> => {
+  const params = GetMatchStandingsByRoundParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: "A valid match id is required." });
+    return;
+  }
+
+  const query = GetMatchStandingsByRoundQueryParams.safeParse(req.query);
+  if (!query.success) {
+    res.status(400).json({ error: "A valid standings round is required." });
+    return;
+  }
+
+  try {
+    const standings = await getMatchStandingsByRound(
+      params.data.matchId,
+      query.data.round,
+      query.data.sourcePath,
+    );
+    res.json(GetMatchStandingsByRoundResponse.parse(standings));
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message === "Standings are unavailable for the selected round"
+    ) {
+      res.status(404).json({ error: error.message });
+      return;
+    }
+
+    req.log.error(
+      { err: error, matchId: params.data.matchId, round: query.data.round },
+      "Unable to load standings for selected round",
+    );
+    res.status(502).json({ error: "Standings are temporarily unavailable." });
   }
 });
 

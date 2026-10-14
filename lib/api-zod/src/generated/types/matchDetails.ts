@@ -8,6 +8,7 @@
 import type { Fixture } from './fixture';
 import type { MatchContentPage } from './matchContentPage';
 import type { MatchEvent } from './matchEvent';
+import type { MatchStandingRoundOption } from './matchStandingRoundOption';
 import type { MatchStat } from './matchStat';
 import type { OddsEntry } from './oddsEntry';
 import type { PreviewFact } from './previewFact';
@@ -22,6 +23,9 @@ export interface MatchDetails {
   standings: StandingRow[];
   homeStandings: StandingRow[];
   awayStandings: StandingRow[];
+  /** @nullable */
+  currentStandingsRound: number | null;
+  standingsRoundOptions: MatchStandingRoundOption[];
   analysisStats: MatchStat[];
   matchStatistics: MatchStat[];
   previewFacts: PreviewFact[];
