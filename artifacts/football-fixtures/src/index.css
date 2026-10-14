@@ -1423,6 +1423,193 @@ a {
   to { opacity: 1; transform: translateY(0); }
 }
 
+.match-team-dossier {
+  display: grid;
+  gap: 24px;
+}
+
+.match-team-dossier-switcher {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  align-items: center;
+  gap: 20px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, .32);
+}
+
+.match-team-dossier-intro h3,
+.match-team-current-odds h3,
+.match-team-dossier-profile-head h3 {
+  margin: 4px 0 0;
+  color: var(--ink);
+  font: 700 23px/1.15 var(--display);
+}
+
+.match-team-dossier-intro > p:last-child {
+  margin: 8px 0 0;
+  color: #777d75;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.match-team-choice-list {
+  display: flex;
+  gap: 8px;
+}
+
+.match-team-choice {
+  display: flex;
+  min-width: 190px;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.match-team-choice:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.match-team-choice.is-selected {
+  border-color: var(--pitch);
+  background: rgba(50, 107, 83, .08);
+}
+
+.match-team-choice-badge {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  place-items: center;
+  border-radius: 50%;
+  background: #fff;
+  color: var(--pitch);
+  font: 700 16px var(--display);
+}
+
+.match-team-choice-badge img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+.match-team-choice-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.match-team-choice-copy small {
+  color: #81867d;
+  font-size: 8px;
+  letter-spacing: .08em;
+}
+
+.match-team-choice-copy strong {
+  font: 600 13px var(--display);
+}
+
+.match-team-current-odds,
+.match-team-dossier-profile {
+  display: grid;
+  gap: 16px;
+}
+
+.match-team-current-odds > header,
+.match-team-dossier-profile-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.match-team-current-odds > header > a,
+.match-team-dossier-profile-head > a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--pitch);
+  font-size: 9px;
+  letter-spacing: .08em;
+  white-space: nowrap;
+}
+
+.match-team-current-odds h3 i {
+  color: var(--pitch);
+  font-size: 15px;
+}
+
+.match-team-dossier-profile-identity {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+
+.match-team-dossier-profile-identity > img,
+.match-team-dossier-profile-identity > span {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  place-items: center;
+  border-radius: 50%;
+  background: #fff;
+  color: var(--pitch);
+  font: 700 20px var(--display);
+  object-fit: contain;
+  padding: 5px;
+}
+
+.match-team-dossier-profile-head h3 {
+  font-size: 20px;
+}
+
+.match-team-dossier-profile-identity > div > p:last-child {
+  margin: 5px 0 0;
+  color: #81867d;
+  font-size: 11px;
+}
+
+.match-team-dossier-loading {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  min-height: 120px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, .42);
+}
+
+.match-team-dossier-loading .team-loading-bar {
+  width: 4px;
+  height: 54px;
+  flex: 0 0 4px;
+}
+
+.match-team-dossier-loading strong {
+  color: var(--ink);
+  font: 600 15px var(--display);
+}
+
+.match-team-dossier-loading p,
+.match-team-dossier-error p {
+  margin: 6px 0 0;
+  color: #777d75;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.match-team-dossier-error {
+  min-height: 100px;
+}
+
 .data-panel-head {
   display: flex;
   justify-content: space-between;

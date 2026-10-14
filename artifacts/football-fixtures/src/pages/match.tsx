@@ -18,11 +18,12 @@ import { Link, useParams } from 'wouter';
 import { BrandMark } from '@/components/brand-mark';
 import { FixtureRow, FixtureSkeleton } from '@/components/fixture-row';
 import { MatchSourceContent } from '@/components/match-source-content';
+import { MatchTeamDetails } from '@/components/match-team-details';
 import { OddsPanel } from '@/components/odds-panel';
 import { SectionEmpty } from '@/components/section-empty';
 import { TeamCrest } from '@/components/team-crest';
 
-const tabs = ['Rounds', 'Standings', 'Analysis', 'Preview', 'Lineups', 'Odds', 'Events'] as const;
+const tabs = ['Rounds', 'Standings', 'Analysis', 'Team Details', 'Preview', 'Lineups', 'Odds', 'Events'] as const;
 type Tab = typeof tabs[number];
 type StandingScope = 'overall' | 'home' | 'away';
 
@@ -378,12 +379,16 @@ function TabContent({
   matchId,
   sourcePath,
   selectedDate,
+  homeTeamSlug,
+  awayTeamSlug,
 }: {
   tab: Tab;
   details: MatchDetails;
   matchId: string;
   sourcePath?: string;
   selectedDate: string;
+  homeTeamSlug?: string | null;
+  awayTeamSlug?: string | null;
 }) {
   if (tab === 'Rounds') {
     const matches = details.roundMatches ?? [];
@@ -462,6 +467,18 @@ function TabContent({
 
   if (tab === 'Events') {
     return <EventsContent details={details} />;
+  }
+
+  if (tab === 'Team Details') {
+    return (
+      <MatchTeamDetails
+        fixture={details.fixture}
+        matchId={matchId}
+        sourcePath={sourcePath}
+        homeTeamSlug={homeTeamSlug}
+        awayTeamSlug={awayTeamSlug}
+      />
+    );
   }
 
   return <OddsPanel matchId={matchId} sourcePath={sourcePath} />;
@@ -607,7 +624,7 @@ export default function MatchPage() {
                   className={tab === item ? 'match-tab active' : 'match-tab'}
                   key={item}
                   onClick={() => setTab(item)}
-                  data-testid={`tab-${item.toLowerCase()}`}
+                  data-testid={`tab-${item.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}
                 >
                   <span className="tab-index">{String(index + 1).padStart(2, '0')}</span>
                   {item}
@@ -629,7 +646,8 @@ export default function MatchPage() {
                           tab === 'Lineups' ? ' sheet.' :
                             tab === 'Analysis' ? ' desk.' :
                               tab === 'Preview' ? ' notes.' :
-                                tab === 'Events' ? ' log.' : ' market.'}
+                          tab === 'Events' ? ' log.' :
+                            tab === 'Team Details' ? ' / both clubs.' : ' market.'}
                     </em>
                   </h2>
                 </div>
@@ -641,6 +659,8 @@ export default function MatchPage() {
                 matchId={matchId}
                 sourcePath={requestParams?.sourcePath}
                 selectedDate={fixture.kickoff.slice(0, 10)}
+                homeTeamSlug={homeSlug ?? teamSlugFromMatchSource(fixture.sourceUrl, 'home')}
+                awayTeamSlug={awaySlug ?? teamSlugFromMatchSource(fixture.sourceUrl, 'away')}
               />
             </section>
             <footer className="page-foot match-foot">

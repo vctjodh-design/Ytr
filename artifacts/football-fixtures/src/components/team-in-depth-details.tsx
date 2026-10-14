@@ -5,6 +5,7 @@ import { OddsPanel } from '@/components/odds-panel';
 
 type Props = {
   details: TeamDetails;
+  showNextMatch?: boolean;
 };
 
 const dossierSections = [
@@ -313,7 +314,7 @@ function MatchRow({
   );
 }
 
-export function TeamInDepthDetails({ details }: Props) {
+export function TeamInDepthDetails({ details, showNextMatch = true }: Props) {
   const teamName = details.team.name;
   const teamSlug = details.team.slug;
   const validMatches = completedMatches(details.recentMatches);
@@ -518,38 +519,40 @@ export function TeamInDepthDetails({ details }: Props) {
         )}
       </section>
 
-      <section className="in-depth-next-match" aria-labelledby="next-match-title">
-        <header className="in-depth-section-heading">
-          <div>
-            <p className="in-depth-kicker">UPCOMING / BE SOCCER MARKETS</p>
-            <h3 id="next-match-title">Next scheduled match</h3>
-          </div>
-          {nextMatchSource ? (
-            <a href={nextMatchSource} target="_blank" rel="noreferrer" data-testid="link-next-match-source">MATCH SOURCE <ExternalLink size={12} /></a>
-          ) : null}
-        </header>
-        {details.nextMatch ? (
-          <>
-            <div className="in-depth-next-fixture" data-testid="next-match-fixture">
-              <div>
-                <span>{details.nextMatch.competition}</span>
-                <strong>{details.nextMatch.homeTeam} <i>v</i> {details.nextMatch.awayTeam}</strong>
-                <small>{new Date(details.nextMatch.kickoff).toLocaleString()}</small>
-              </div>
-              <div className="in-depth-kickoff-status">
-                <span>{details.nextMatch.status || 'Scheduled'}</span>
-                {nextMatchSource ? <a href={nextMatchSource} target="_blank" rel="noreferrer" aria-label="Open scheduled match source"><ExternalLink size={14} /></a> : null}
-              </div>
+      {showNextMatch ? (
+        <section className="in-depth-next-match" aria-labelledby="next-match-title">
+          <header className="in-depth-section-heading">
+            <div>
+              <p className="in-depth-kicker">UPCOMING / BE SOCCER MARKETS</p>
+              <h3 id="next-match-title">Next scheduled match</h3>
             </div>
-            <OddsPanel matchId={details.nextMatch.id} sourcePath={nextMatchPath} />
-          </>
-        ) : (
-          <div className="in-depth-source-unavailable" data-testid="status-no-next-match">
-            <span>NO UPCOMING FIXTURE SUPPLIED</span>
-            <p>Odds are shown when a scheduled match is present in the club response.</p>
-          </div>
-        )}
-      </section>
+            {nextMatchSource ? (
+              <a href={nextMatchSource} target="_blank" rel="noreferrer" data-testid="link-next-match-source">MATCH SOURCE <ExternalLink size={12} /></a>
+            ) : null}
+          </header>
+          {details.nextMatch ? (
+            <>
+              <div className="in-depth-next-fixture" data-testid="next-match-fixture">
+                <div>
+                  <span>{details.nextMatch.competition}</span>
+                  <strong>{details.nextMatch.homeTeam} <i>v</i> {details.nextMatch.awayTeam}</strong>
+                  <small>{new Date(details.nextMatch.kickoff).toLocaleString()}</small>
+                </div>
+                <div className="in-depth-kickoff-status">
+                  <span>{details.nextMatch.status || 'Scheduled'}</span>
+                  {nextMatchSource ? <a href={nextMatchSource} target="_blank" rel="noreferrer" aria-label="Open scheduled match source"><ExternalLink size={14} /></a> : null}
+                </div>
+              </div>
+              <OddsPanel matchId={details.nextMatch.id} sourcePath={nextMatchPath} />
+            </>
+          ) : (
+            <div className="in-depth-source-unavailable" data-testid="status-no-next-match">
+              <span>NO UPCOMING FIXTURE SUPPLIED</span>
+              <p>Odds are shown when a scheduled match is present in the club response.</p>
+            </div>
+          )}
+        </section>
+      ) : null}
     </div>
   );
 }

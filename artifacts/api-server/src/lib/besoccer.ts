@@ -25,6 +25,8 @@ const besoccerOrigin = "https://www.besoccer.com";
 const markdownProxyOrigin = "https://r.jina.ai/http://www.besoccer.com";
 const responseCache = new Map<string, { expiresAt: number; value: unknown }>();
 const pendingRequests = new Map<string, Promise<string>>();
+const rawHtmlWaiters: Array<() => void> = [];
+let activeRawHtmlRequests = 0;
 const knownFixtures = new Map<string, Fixture>();
 const knownMatchPaths = new Map<string, string>();
 const knownCompetitionKeys = new Map<string, string>();
@@ -52,6 +54,23 @@ function sourceCacheTtl(path: string): number {
     /^\/ajax\/matchesScroll(?:[?#]|$)/i.test(path)
     ? 15_000
     : 90_000;
+}
+
+async function acquireRawHtmlSlot(): Promise<void> {
+  if (activeRawHtmlRequests < 2) {
+    activeRawHtmlRequests += 1;
+    return;
+  }
+  await new Promise<void>((resolve) => rawHtmlWaiters.push(resolve));
+}
+
+function releaseRawHtmlSlot(): void {
+  const next = rawHtmlWaiters.shift();
+  if (next) {
+    next();
+  } else {
+    activeRawHtmlRequests -= 1;
+  }
 }
 
 async function getMarkdown(path: string): Promise<string> {
@@ -99,24 +118,43 @@ async function getRawHtml(path: string): Promise<string> {
   if (pending) return pending;
 
   const request = (async () => {
-    const response = await fetch(`${markdownProxyOrigin}${path}`, {
-      headers: {
-        Accept: "text/html",
-        "User-Agent": "FootballFixturesExplorer/1.0",
-        "X-Respond-With": "html",
-      },
-      signal: AbortSignal.timeout(25_000),
-    });
-    if (!response.ok) {
-      throw new Error(`Source proxy returned HTTP ${response.status}`);
-    }
+    await acquireRawHtmlSlot();
+    try {
+      const requestUrl = `${markdownProxyOrigin}${path}`;
+      const requestOptions = {
+        headers: {
+          Accept: "text/html",
+          "User-Agent": "FootballFixturesExplorer/1.0",
+          "X-Respond-With": "html",
+        },
+        signal: AbortSignal.timeout(25_000),
+      };
+      let response = await fetch(requestUrl, requestOptions);
+      if (response.status === 429) {
+        const retryAfter = response.headers.get("retry-after");
+        const retryAfterMs = retryAfter
+          ? /^\d+(?:\.\d+)?$/.test(retryAfter)
+            ? Number(retryAfter) * 1_000
+            : Date.parse(retryAfter) - Date.now()
+          : 1_200;
+        await new Promise((resolve) =>
+          setTimeout(resolve, Math.min(5_000, Math.max(500, retryAfterMs))),
+        );
+        response = await fetch(requestUrl, requestOptions);
+      }
+      if (!response.ok) {
+        throw new Error(`Source proxy returned HTTP ${response.status}`);
+      }
 
-    const html = await response.text();
-    if (html.length < 80) {
-      throw new Error("The BeSoccer page returned no odds data");
+      const html = await response.text();
+      if (html.length < 80) {
+        throw new Error("The BeSoccer page returned no odds data");
+      }
+      saveCache(cacheKey, html, sourceCacheTtl(path));
+      return html;
+    } finally {
+      releaseRawHtmlSlot();
     }
-    saveCache(cacheKey, html, sourceCacheTtl(path));
-    return html;
   })();
 
   pendingRequests.set(pendingKey, request);
