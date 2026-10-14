@@ -2711,9 +2711,63 @@ export async function getTeamDetails(teamSlug: string): Promise<TeamDetails> {
           : [],
     };
   });
+  const matchesResult = results[1];
+  const today = new Date().toISOString().slice(0, 10);
+  const matchFixtures = matchesResult?.status === "fulfilled"
+    ? parseFixtureCards(matchesResult.value, today)
+    : [];
+  const uniqueMatchFixtures = Array.from(
+    new Map(matchFixtures.map((fixture) => [fixture.id, fixture])).values(),
+  );
+  const recentMatches = uniqueMatchFixtures
+    .filter(
+      (fixture) =>
+        fixture.status === "Finished" &&
+        fixture.homeScore !== null &&
+        fixture.awayScore !== null &&
+        fixture.kickoff.slice(0, 10) <= today,
+    )
+    .sort((left, right) => right.kickoff.localeCompare(left.kickoff))
+    .slice(0, 10);
+  const nextMatch = uniqueMatchFixtures
+    .filter(
+      (fixture) =>
+        fixture.status === "Scheduled" &&
+        fixture.homeScore === null &&
+        fixture.awayScore === null &&
+        fixture.kickoff.slice(0, 10) >= today,
+    )
+    .sort((left, right) => left.kickoff.localeCompare(right.kickoff))[0] ?? null;
+  const eloCandidates = [recentMatches[0], nextMatch].filter(
+    (fixture): fixture is Fixture => fixture !== undefined && fixture !== null,
+  );
+  const eloResults = await Promise.allSettled(
+    eloCandidates.map(async (fixture) => {
+      const matchPath = new URL(fixture.sourceUrl).pathname;
+      const analysis = await getMarkdown(`${matchPath}/analysis`);
+      return { fixture, stats: parseAnalysis(analysis) };
+    }),
+  );
+  const eloResult = eloResults.find(
+    (result) =>
+      result.status === "fulfilled" &&
+      result.value.stats.some((stat) =>
+        ["ELO", "Tilt", "General ELO ranking", "Country ELO ranking"].includes(
+          stat.label,
+        ),
+      ),
+  );
+  const eloAnalysisMatch =
+    eloResult?.status === "fulfilled" ? eloResult.value.fixture : null;
+  const eloAnalysisStats =
+    eloResult?.status === "fulfilled" ? eloResult.value.stats : [];
   const result = {
     team: parseTeamProfile(infoResult.value, teamSlug),
     pages,
+    recentMatches,
+    nextMatch,
+    eloAnalysisMatch,
+    eloAnalysisStats,
   };
   saveCache(`team:${teamSlug}`, result, 120_000);
   return result;

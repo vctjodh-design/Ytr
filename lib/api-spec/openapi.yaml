@@ -650,7 +650,27 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/TeamContentPage"
-      required: [team, pages]
+        recentMatches:
+          type: array
+          description: The ten most recent completed matches for this team
+          items:
+            $ref: "#/components/schemas/Fixture"
+        nextMatch:
+          anyOf:
+            - $ref: "#/components/schemas/Fixture"
+            - type: "null"
+          description: The next scheduled match for this team, when available
+        eloAnalysisMatch:
+          anyOf:
+            - $ref: "#/components/schemas/Fixture"
+            - type: "null"
+          description: Match used as the reference for the team's BeSoccer analysis ratings
+        eloAnalysisStats:
+          type: array
+          description: ELO, tilt, general ranking, and country ranking from the reference match's analysis
+          items:
+            $ref: "#/components/schemas/MatchStat"
+      required: [team, pages, recentMatches, nextMatch, eloAnalysisMatch, eloAnalysisStats]
     TeamContentPage:
       type: object
       properties:

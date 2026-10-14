@@ -261,6 +261,14 @@ export interface TeamContentPage {
 export interface TeamDetails {
   team: TeamProfile;
   pages: TeamContentPage[];
+  /** The ten most recent completed matches for this team */
+  recentMatches: Fixture[];
+  /** The next scheduled match for this team, when available */
+  nextMatch: Fixture | null;
+  /** Match used as the reference for the team's BeSoccer analysis ratings */
+  eloAnalysisMatch: Fixture | null;
+  /** ELO, tilt, general ranking, and country ranking from the reference match's analysis */
+  eloAnalysisStats: MatchStat[];
 }
 
 export interface PlayerProfile {

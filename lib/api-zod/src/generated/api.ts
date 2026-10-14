@@ -289,7 +289,54 @@ export const GetTeamDetailsResponse = zod.object({
   "coachSlugs": zod.array(zod.array(zod.string().nullable())).optional()
 })).optional()
 }))
-}))
+})),
+  "recentMatches": zod.array(zod.object({
+  "id": zod.string(),
+  "sourceUrl": zod.string().url(),
+  "competition": zod.string(),
+  "round": zod.string().nullable(),
+  "homeTeam": zod.string(),
+  "homeBadgeUrl": zod.string().url().nullable(),
+  "awayTeam": zod.string(),
+  "awayBadgeUrl": zod.string().url().nullable(),
+  "kickoff": zod.string(),
+  "status": zod.string(),
+  "homeScore": zod.number().int().nullable(),
+  "awayScore": zod.number().int().nullable()
+})).describe('The ten most recent completed matches for this team'),
+  "nextMatch": zod.union([zod.object({
+  "id": zod.string(),
+  "sourceUrl": zod.string().url(),
+  "competition": zod.string(),
+  "round": zod.string().nullable(),
+  "homeTeam": zod.string(),
+  "homeBadgeUrl": zod.string().url().nullable(),
+  "awayTeam": zod.string(),
+  "awayBadgeUrl": zod.string().url().nullable(),
+  "kickoff": zod.string(),
+  "status": zod.string(),
+  "homeScore": zod.number().int().nullable(),
+  "awayScore": zod.number().int().nullable()
+}),zod.null()]).describe('The next scheduled match for this team, when available'),
+  "eloAnalysisMatch": zod.union([zod.object({
+  "id": zod.string(),
+  "sourceUrl": zod.string().url(),
+  "competition": zod.string(),
+  "round": zod.string().nullable(),
+  "homeTeam": zod.string(),
+  "homeBadgeUrl": zod.string().url().nullable(),
+  "awayTeam": zod.string(),
+  "awayBadgeUrl": zod.string().url().nullable(),
+  "kickoff": zod.string(),
+  "status": zod.string(),
+  "homeScore": zod.number().int().nullable(),
+  "awayScore": zod.number().int().nullable()
+}),zod.null()]).describe('Match used as the reference for the team\'s BeSoccer analysis ratings'),
+  "eloAnalysisStats": zod.array(zod.object({
+  "label": zod.string(),
+  "homeValue": zod.string(),
+  "awayValue": zod.string()
+})).describe('ELO, tilt, general ranking, and country ranking from the reference match\'s analysis')
 })
 
 

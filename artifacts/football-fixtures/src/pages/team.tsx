@@ -6,8 +6,11 @@ import { Link, useParams } from 'wouter';
 import { BrandMark } from '@/components/brand-mark';
 import { MatchSourceContent } from '@/components/match-source-content';
 import { SectionEmpty } from '@/components/section-empty';
+import { TeamInDepthDetails } from '@/components/team-in-depth-details';
 
-const tabs: { id: TeamContentPageTab; label: string }[] = [
+type TeamTab = TeamContentPageTab | 'in-depth';
+
+const tabs: { id: TeamTab; label: string }[] = [
   { id: 'info', label: 'Info' },
   { id: 'matches', label: 'Matches' },
   { id: 'transfers', label: 'Transfers' },
@@ -18,6 +21,7 @@ const tabs: { id: TeamContentPageTab; label: string }[] = [
   { id: 'injuries-suspensions', label: 'Injuries & Suspensions' },
   { id: 'honours', label: 'Honours' },
   { id: 'historical', label: 'Historical' },
+  { id: 'in-depth', label: 'In-depth team details' },
 ];
 
 function validHttpUrl(value?: string | null) {
@@ -32,7 +36,7 @@ function validHttpUrl(value?: string | null) {
 
 export default function TeamPage() {
   const { teamSlug = '' } = useParams<{ teamSlug: string }>();
-  const [tab, setTab] = useState<TeamContentPageTab>('info');
+  const [tab, setTab] = useState<TeamTab>('info');
   const { data, isLoading, isError, refetch, isFetching } = useGetTeamDetails(teamSlug, {
     query: {
       enabled: Boolean(teamSlug),
@@ -44,7 +48,7 @@ export default function TeamPage() {
     },
   });
   const team = data?.team;
-  const page = data?.pages?.find((item) => item.tab === tab);
+  const page = tab === 'in-depth' ? undefined : data?.pages?.find((item) => item.tab === tab);
   const sourceLink = validHttpUrl(team?.sourceUrl);
 
   return (
@@ -150,11 +154,13 @@ export default function TeamPage() {
               <header className="team-content-heading">
                 <div>
                   <p className="eyebrow"><span className="eyebrow-mark">{String(tabs.findIndex((item) => item.id === tab) + 1).padStart(2, '0')}</span> / TEAM INTELLIGENCE</p>
-                  <h2>{tabs.find((item) => item.id === tab)?.label}<em> / source file</em></h2>
+                  <h2>{tabs.find((item) => item.id === tab)?.label}<em> / {tab === 'in-depth' ? 'club dossier' : 'source file'}</em></h2>
                 </div>
-                <span className="team-source-note">{tab.toUpperCase()} / API-PROVIDED CONTENT</span>
+                <span className="team-source-note">{tab === 'in-depth' ? 'RECENT FORM / SOURCE-BACKED' : `${tab.toUpperCase()} / API-PROVIDED CONTENT`}</span>
               </header>
-              {page ? (
+              {tab === 'in-depth' ? (
+                <TeamInDepthDetails details={data} />
+              ) : page ? (
                 <MatchSourceContent page={page} tab={tabs.find((item) => item.id === tab)?.label || tab} />
               ) : (
                 <SectionEmpty

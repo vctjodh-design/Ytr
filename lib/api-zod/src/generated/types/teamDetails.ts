@@ -5,10 +5,20 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { Fixture } from './fixture';
+import type { MatchStat } from './matchStat';
 import type { TeamContentPage } from './teamContentPage';
 import type { TeamProfile } from './teamProfile';
 
 export interface TeamDetails {
   team: TeamProfile;
   pages: TeamContentPage[];
+  /** The ten most recent completed matches for this team */
+  recentMatches: Fixture[];
+  /** The next scheduled match for this team, when available */
+  nextMatch: Fixture | null;
+  /** Match used as the reference for the team's BeSoccer analysis ratings */
+  eloAnalysisMatch: Fixture | null;
+  /** ELO, tilt, general ranking, and country ranking from the reference match's analysis */
+  eloAnalysisStats: MatchStat[];
 }
