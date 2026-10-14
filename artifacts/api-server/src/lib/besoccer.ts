@@ -1527,33 +1527,20 @@ export async function listFixturesForDate(date: string): Promise<FixtureList> {
 
   const path = `/livescore/${date}`;
   const competitionKeys = new Map<string, string | null>();
-  const [markdownResult, htmlResult] = await Promise.allSettled([
-    getMarkdown(path),
-    getRawHtml(path),
-  ]);
-  if (markdownResult.status === "rejected" && htmlResult.status === "rejected") {
-    throw markdownResult.reason;
+  const htmlResult = await Promise.allSettled([getRawHtml(path)]).then(
+    ([result]) => result,
+  );
+  let htmlFixtures: Fixture[] = [];
+  let scrolledFixtures: Fixture[] = [];
+  if (htmlResult.status === "fulfilled") {
+    htmlFixtures = parseFixtureCards(htmlResult.value, date, competitionKeys);
+    scrolledFixtures = await getScrolledFixtures(
+      htmlResult.value,
+      date,
+      competitionKeys,
+    );
   }
 
-  const markdownFixtures =
-    markdownResult.status === "fulfilled"
-      ? parseFixtureLinks(
-          markdownResult.value,
-          date,
-          "Football",
-          null,
-          competitionKeys,
-        )
-      : [];
-  const htmlFixtures =
-    htmlResult.status === "fulfilled"
-      ? parseFixtureCards(htmlResult.value, date, competitionKeys)
-      : [];
-  const scrolledFixtures =
-    htmlResult.status === "fulfilled"
-      ? await getScrolledFixtures(htmlResult.value, date, competitionKeys)
-      : [];
-  const markdownById = new Map(markdownFixtures.map((fixture) => [fixture.id, fixture]));
   const sourceFixtures = Array.from(
     new Map(
       [...htmlFixtures, ...scrolledFixtures].map((fixture) => [
@@ -1562,6 +1549,26 @@ export async function listFixturesForDate(date: string): Promise<FixtureList> {
       ]),
     ).values(),
   );
+  let markdownFixtures: Fixture[] = [];
+  if (htmlResult.status === "rejected" || sourceFixtures.length === 0) {
+    const markdownResult = await Promise.allSettled([getMarkdown(path)]).then(
+      ([result]) => result,
+    );
+    if (htmlResult.status === "rejected" && markdownResult.status === "rejected") {
+      throw markdownResult.reason;
+    }
+    if (markdownResult.status === "fulfilled") {
+      markdownFixtures = parseFixtureLinks(
+        markdownResult.value,
+        date,
+        "Football",
+        null,
+        competitionKeys,
+      );
+    }
+  }
+
+  const markdownById = new Map(markdownFixtures.map((fixture) => [fixture.id, fixture]));
   const htmlIds = new Set(sourceFixtures.map((fixture) => fixture.id));
   const fixtures = [
     ...sourceFixtures.map((fixture) => {
