@@ -24,6 +24,7 @@ router.get("/fixtures", async (req, res): Promise<void> => {
     return;
   }
 
+  res.setHeader("Cache-Control", "no-store");
   try {
     const fixtures = await listFixturesForDate(date);
     res.json(ListFixturesResponse.parse(fixtures));

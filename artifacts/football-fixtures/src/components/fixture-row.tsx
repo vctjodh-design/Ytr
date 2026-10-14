@@ -23,8 +23,25 @@ function timeLabel(kickoff: string, selectedDate: string) {
   return new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }).format(date);
 }
 
+function liveMinute(status: string): string | null {
+  const match = status.trim().match(/^(\d{1,3}(?:\+\d{1,2})?)\s*['’′]$/);
+  return match ? `${match[1]}′` : null;
+}
+
+function isLiveStatus(status: string): boolean {
+  const state = status.trim().toLowerCase();
+  return (
+    Boolean(liveMinute(status)) ||
+    /\b(?:live|playing)\b/.test(state) ||
+    /^(?:ht|half[- ]time)$/.test(state)
+  );
+}
+
 function matchState(fixture: Fixture, selectedDate: string) {
   const state = fixture.status.toLowerCase();
+  const minute = liveMinute(fixture.status);
+  if (minute) return minute;
+  if (state.includes('half-time') || state === 'ht') return 'HT';
   if (state.includes('live') || state.includes('playing')) return 'LIVE';
   if (state.includes('finished') || state.includes('ended')) return 'FT';
   if (fixture.homeScore !== null && fixture.awayScore !== null) return 'FT';
@@ -54,14 +71,15 @@ function fixtureTeamSlugs(fixture: Fixture) {
 }
 
 export function FixtureRow({ fixture, selectedDate }: { fixture: Fixture; selectedDate: string }) {
-  const isLive = matchState(fixture, selectedDate) === 'LIVE';
+  const isLive = isLiveStatus(fixture.status);
+  const stateLabel = matchState(fixture, selectedDate);
   const hasScore = fixture.homeScore !== null && fixture.awayScore !== null;
   const teamSlugs = fixtureTeamSlugs(fixture);
   const href = matchHref(fixture);
   return (
     <div className="fixture-row" data-testid={`fixture-${fixture.id}`}>
       <div className="fixture-state">
-        <span className={isLive ? 'live-label' : 'kickoff-label'}>{isLive && <i />}{matchState(fixture, selectedDate)}</span>
+        <span className={isLive ? 'live-label' : 'kickoff-label'}>{isLive && <i />}{stateLabel}</span>
         {fixture.round && <span className="fixture-round">{fixture.round}</span>}
       </div>
       <div className="fixture-versus">

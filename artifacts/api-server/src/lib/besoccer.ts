@@ -47,6 +47,13 @@ function saveCache(key: string, value: unknown, ttlMs: number): void {
   responseCache.set(key, { expiresAt: Date.now() + ttlMs, value });
 }
 
+function sourceCacheTtl(path: string): number {
+  return /^\/livescore\/\d{4}-\d{2}-\d{2}(?:[?#]|$)/i.test(path) ||
+    /^\/ajax\/matchesScroll(?:[?#]|$)/i.test(path)
+    ? 15_000
+    : 90_000;
+}
+
 async function getMarkdown(path: string): Promise<string> {
   const cached = fromCache<string>(`page:${path}`);
   if (cached) return cached;
@@ -70,7 +77,7 @@ async function getMarkdown(path: string): Promise<string> {
     if (markdown.length < 120 || !markdown.includes("URL Source:")) {
       throw new Error("The BeSoccer page returned no readable match data");
     }
-    saveCache(`page:${path}`, markdown, 90_000);
+    saveCache(`page:${path}`, markdown, sourceCacheTtl(path));
     return markdown;
   })();
 
@@ -108,7 +115,7 @@ async function getRawHtml(path: string): Promise<string> {
     if (html.length < 80) {
       throw new Error("The BeSoccer page returned no odds data");
     }
-    saveCache(cacheKey, html, 90_000);
+    saveCache(cacheKey, html, sourceCacheTtl(path));
     return html;
   })();
 
@@ -1552,7 +1559,8 @@ export async function listFixturesForDate(date: string): Promise<FixtureList> {
     fetchedAt: new Date(),
     fixtures,
   };
-  saveCache(`fixtures:${date}`, result, 60_000);
+  const currentDate = new Date().toISOString().slice(0, 10);
+  saveCache(`fixtures:${date}`, result, date === currentDate ? 15_000 : 60_000);
   return result;
 }
 
@@ -2621,7 +2629,7 @@ function parsePlayerProfile(html: string, slug: string): PlayerProfile {
       }),
     nationality: textValue(asRecord(person.nationality)?.name),
     nationalityFlagUrl: imageUrlFromNode(flagNode ?? { tag: "img", attrs: {}, children: [] }),
-    birthDate: validBirthDate,
+    birthDate: validBirthDate?.toISOString() ?? null,
     age: ageValue ?? ageFromBirthDate,
     heightCm: parseNumber(textValue(asRecord(person.height)?.value) ?? undefined),
     weightKg: parseNumber(textValue(asRecord(person.weight)?.value) ?? undefined),
