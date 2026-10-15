@@ -37,18 +37,32 @@ function validHttpUrl(value?: string | null) {
 export default function TeamPage() {
   const { teamSlug = '' } = useParams<{ teamSlug: string }>();
   const [tab, setTab] = useState<TeamTab>('info');
-  const { data, isLoading, isError, refetch, isFetching } = useGetTeamDetails(teamSlug, {
+  const profileQuery = useGetTeamDetails(teamSlug, { tab: 'info' }, {
     query: {
       enabled: Boolean(teamSlug),
-      queryKey: getGetTeamDetailsQueryKey(teamSlug),
-      staleTime: 0,
-      refetchOnMount: 'always',
+      queryKey: getGetTeamDetailsQueryKey(teamSlug, { tab: 'info' }),
+      staleTime: 90_000,
       refetchOnWindowFocus: false,
-      retry: 2,
+      retry: 1,
     },
   });
-  const team = data?.team;
-  const page = tab === 'in-depth' ? undefined : data?.pages?.find((item) => item.tab === tab);
+  const sectionQuery = useGetTeamDetails(teamSlug, { tab }, {
+    query: {
+      enabled: Boolean(teamSlug) && tab !== 'info',
+      queryKey: getGetTeamDetailsQueryKey(teamSlug, { tab }),
+      staleTime: 90_000,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  });
+  const activeQuery = tab === 'info' ? profileQuery : sectionQuery;
+  const data = activeQuery.data;
+  const team = profileQuery.data?.team ?? data?.team;
+  const page = data?.pages?.find((item) => item.tab === tab);
+  const isLoading = profileQuery.isLoading;
+  const isError = profileQuery.isError;
+  const refetch = activeQuery.refetch;
+  const isFetching = activeQuery.isFetching;
   const sourceLink = validHttpUrl(team?.sourceUrl);
 
   return (
@@ -87,7 +101,7 @@ export default function TeamPage() {
             <div className="team-loading-bar" />
             <div className="team-loading-bar" />
           </section>
-        ) : isError || !data || !team ? (
+        ) : isError || !profileQuery.data || !team ? (
           <div className="error-panel team-error" data-testid="status-team-error">
             <CircleAlert size={22} />
             <div>
@@ -127,7 +141,7 @@ export default function TeamPage() {
                 </div>
                 <div className="team-metric">
                   <span>PAGES</span>
-                  <strong>{data.pages.length.toString().padStart(2, '0')}</strong>
+                  <strong>{String(tabs.length - 1).padStart(2, '0')}</strong>
                 </div>
               </div>
             </section>
@@ -158,8 +172,21 @@ export default function TeamPage() {
                 </div>
                 <span className="team-source-note">{tab === 'in-depth' ? 'RECENT FORM / SOURCE-BACKED' : `${tab.toUpperCase()} / API-PROVIDED CONTENT`}</span>
               </header>
-              {tab === 'in-depth' ? (
-                <TeamInDepthDetails details={data} />
+              {tab !== 'info' && sectionQuery.isLoading ? (
+                <div className="team-loading" role="status" data-testid="status-team-tab-loading">
+                  <div className="team-loading-bar" />
+                  <p>Loading this section from the source…</p>
+                </div>
+              ) : tab !== 'info' && sectionQuery.isError ? (
+                <div className="error-panel team-error" role="alert" data-testid="status-team-tab-error">
+                  <CircleAlert size={20} />
+                  <div><strong>This section is unavailable.</strong><p>The source page could not be loaded.</p></div>
+                  <button type="button" onClick={() => sectionQuery.refetch()} disabled={sectionQuery.isFetching}>
+                    {sectionQuery.isFetching ? 'Retrying' : 'Try again'}
+                  </button>
+                </div>
+              ) : tab === 'in-depth' && sectionQuery.data ? (
+                <TeamInDepthDetails details={sectionQuery.data} />
               ) : page ? (
                 <MatchSourceContent page={page} tab={tabs.find((item) => item.id === tab)?.label || tab} />
               ) : (

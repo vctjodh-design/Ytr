@@ -5,10 +5,15 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { GetMatchDetailsSection } from './getMatchDetailsSection';
 
 export type GetMatchDetailsParams = {
 /**
  * Canonical BeSoccer match path copied from the fixture link
  */
 sourcePath?: string;
+/**
+ * Load only the selected match section
+ */
+section?: GetMatchDetailsSection;
 };

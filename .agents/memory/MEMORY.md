@@ -2,3 +2,4 @@
 - [BeSoccer match rounds](besoccer-rounds.md) — public match-table reload supports historical standings; the match page does not expose the mobile round-fixture selector.
 - [BeSoccer team content](besoccer-team-content.md) — parse team tabs from ordered HTML modules; markdown collapses images and page structure.
 - [BeSoccer player names](besoccer-player-content.md) — JSON-LD can identify the site, not the player; validate it and prefer the page title or portrait alt.
+- [API Zod barrel](api-zod-barrel.md) — avoid wildcard re-exports of generated operation parameter types beside same-named Zod schemas.

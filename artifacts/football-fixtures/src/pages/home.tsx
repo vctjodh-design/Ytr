@@ -73,7 +73,7 @@ export default function HomePage() {
               <h1>Matchday <em>ledger.</em></h1>
               <p className="page-deck">The full picture of football, one kickoff at a time.</p>
             </div>
-            <div className="heading-aside"><Sparkles size={14} /><span>SCRAPED FROM<br />BESOCCER</span></div>
+            <div className="heading-aside"><Sparkles size={14} /><span>SOURCE-PARSED<br />BESOCCER</span></div>
           </div>
           <div className="date-toolbar">
             <div className="date-nav">

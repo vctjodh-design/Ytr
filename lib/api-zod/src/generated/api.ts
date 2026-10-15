@@ -46,7 +46,7 @@ export const ListFixturesResponse = zod.object({
 
 
 /**
- * @summary Get all available details for a BeSoccer match
+ * @summary Get match details and the selected BeSoccer section
  */
 export const getMatchDetailsPathMatchIdRegExp = new RegExp('^[0-9]+$');
 
@@ -56,7 +56,8 @@ export const GetMatchDetailsParams = zod.object({
 })
 
 export const GetMatchDetailsQueryParams = zod.object({
-  "sourcePath": zod.coerce.string().optional().describe('Canonical BeSoccer match path copied from the fixture link')
+  "sourcePath": zod.coerce.string().optional().describe('Canonical BeSoccer match path copied from the fixture link'),
+  "section": zod.enum(['rounds', 'standings', 'analysis', 'preview', 'lineups', 'events']).optional().describe('Load only the selected match section')
 })
 
 export const GetMatchDetailsResponse = zod.object({
@@ -291,13 +292,17 @@ export const GetMatchStandingsByRoundResponse = zod.object({
 
 
 /**
- * @summary Get BeSoccer team profile and tab data
+ * @summary Get a BeSoccer team profile and the selected tab
  */
 export const getTeamDetailsPathTeamSlugRegExp = new RegExp('^[a-z0-9-]+$');
 
 
 export const GetTeamDetailsParams = zod.object({
   "teamSlug": zod.coerce.string().regex(getTeamDetailsPathTeamSlugRegExp)
+})
+
+export const GetTeamDetailsQueryParams = zod.object({
+  "tab": zod.enum(['info', 'matches', 'transfers', 'squad', 'standings', 'career', 'competitions', 'injuries-suspensions', 'honours', 'historical', 'in-depth']).optional().describe('Load only the selected team page; in-depth loads recent form and ratings')
 })
 
 export const GetTeamDetailsResponse = zod.object({
@@ -385,13 +390,17 @@ export const GetTeamDetailsResponse = zod.object({
 
 
 /**
- * @summary Get BeSoccer player profile and tab data
+ * @summary Get a BeSoccer player profile and the selected tab
  */
 export const getPlayerDetailsPathPlayerSlugRegExp = new RegExp('^[a-z0-9-]+$');
 
 
 export const GetPlayerDetailsParams = zod.object({
   "playerSlug": zod.coerce.string().regex(getPlayerDetailsPathPlayerSlugRegExp)
+})
+
+export const GetPlayerDetailsQueryParams = zod.object({
+  "tab": zod.enum(['info', 'matches', 'career', 'achievements', 'milestones', 'attributes', 'transfers', 'teammates']).optional().describe('Load only the selected player page')
 })
 
 export const GetPlayerDetailsResponse = zod.object({

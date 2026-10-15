@@ -21,6 +21,8 @@ import type {
   GetMatchDetailsParams,
   GetMatchOddsParams,
   GetMatchStandingsByRoundParams,
+  GetPlayerDetailsParams,
+  GetTeamDetailsParams,
   HealthStatus,
   ListFixturesParams,
   MatchDetails,
@@ -236,7 +238,7 @@ export const getGetMatchDetailsUrl = (matchId: string,
 }
 
 /**
- * @summary Get all available details for a BeSoccer match
+ * @summary Get match details and the selected BeSoccer section
  */
 export const getMatchDetails = async (matchId: string,
     params?: GetMatchDetailsParams, options?: Parameters<typeof customFetch>[1]): Promise<MatchDetails> => {
@@ -286,7 +288,7 @@ export type GetMatchDetailsQueryError = ErrorType<ErrorResponse>
 
 
 /**
- * @summary Get all available details for a BeSoccer match
+ * @summary Get match details and the selected BeSoccer section
  */
 
 export function useGetMatchDetails<TData = Awaited<ReturnType<typeof getMatchDetails>>, TError = ErrorType<ErrorResponse>>(
@@ -486,20 +488,29 @@ export function useGetMatchStandingsByRound<TData = Awaited<ReturnType<typeof ge
 
 
 
-export const getGetTeamDetailsUrl = (teamSlug: string,) => {
+export const getGetTeamDetailsUrl = (teamSlug: string,
+    params?: GetTeamDetailsParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/teams/${teamSlug}`
+  return stringifiedParams.length > 0 ? `/api/teams/${teamSlug}?${stringifiedParams}` : `/api/teams/${teamSlug}`
 }
 
 /**
- * @summary Get BeSoccer team profile and tab data
+ * @summary Get a BeSoccer team profile and the selected tab
  */
-export const getTeamDetails = async (teamSlug: string, options?: Parameters<typeof customFetch>[1]): Promise<TeamDetails> => {
+export const getTeamDetails = async (teamSlug: string,
+    params?: GetTeamDetailsParams, options?: Parameters<typeof customFetch>[1]): Promise<TeamDetails> => {
 
-  return customFetch<TeamDetails>(getGetTeamDetailsUrl(teamSlug),
+  return customFetch<TeamDetails>(getGetTeamDetailsUrl(teamSlug,params),
   {
     ...options,
     method: 'GET'
@@ -512,23 +523,25 @@ export const getTeamDetails = async (teamSlug: string, options?: Parameters<type
 
 
 
-export const getGetTeamDetailsQueryKey = (teamSlug: string,) => {
+export const getGetTeamDetailsQueryKey = (teamSlug: string,
+    params?: GetTeamDetailsParams,) => {
     return [
-    `/api/teams/${teamSlug}`
+    `/api/teams/${teamSlug}`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetTeamDetailsQueryOptions = <TData = Awaited<ReturnType<typeof getTeamDetails>>, TError = ErrorType<ErrorResponse>>(teamSlug: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTeamDetails>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetTeamDetailsQueryOptions = <TData = Awaited<ReturnType<typeof getTeamDetails>>, TError = ErrorType<ErrorResponse>>(teamSlug: string,
+    params?: GetTeamDetailsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTeamDetails>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetTeamDetailsQueryKey(teamSlug);
+  const queryKey =  queryOptions?.queryKey ?? getGetTeamDetailsQueryKey(teamSlug,params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTeamDetails>>> = ({ signal }) => getTeamDetails(teamSlug, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTeamDetails>>> = ({ signal }) => getTeamDetails(teamSlug,params, { signal, ...requestOptions });
 
 
 
@@ -542,15 +555,16 @@ export type GetTeamDetailsQueryError = ErrorType<ErrorResponse>
 
 
 /**
- * @summary Get BeSoccer team profile and tab data
+ * @summary Get a BeSoccer team profile and the selected tab
  */
 
 export function useGetTeamDetails<TData = Awaited<ReturnType<typeof getTeamDetails>>, TError = ErrorType<ErrorResponse>>(
- teamSlug: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTeamDetails>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ teamSlug: string,
+    params?: GetTeamDetailsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTeamDetails>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetTeamDetailsQueryOptions(teamSlug,options)
+  const queryOptions = getGetTeamDetailsQueryOptions(teamSlug,params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -563,20 +577,29 @@ export function useGetTeamDetails<TData = Awaited<ReturnType<typeof getTeamDetai
 
 
 
-export const getGetPlayerDetailsUrl = (playerSlug: string,) => {
+export const getGetPlayerDetailsUrl = (playerSlug: string,
+    params?: GetPlayerDetailsParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/players/${playerSlug}`
+  return stringifiedParams.length > 0 ? `/api/players/${playerSlug}?${stringifiedParams}` : `/api/players/${playerSlug}`
 }
 
 /**
- * @summary Get BeSoccer player profile and tab data
+ * @summary Get a BeSoccer player profile and the selected tab
  */
-export const getPlayerDetails = async (playerSlug: string, options?: Parameters<typeof customFetch>[1]): Promise<PlayerDetails> => {
+export const getPlayerDetails = async (playerSlug: string,
+    params?: GetPlayerDetailsParams, options?: Parameters<typeof customFetch>[1]): Promise<PlayerDetails> => {
 
-  return customFetch<PlayerDetails>(getGetPlayerDetailsUrl(playerSlug),
+  return customFetch<PlayerDetails>(getGetPlayerDetailsUrl(playerSlug,params),
   {
     ...options,
     method: 'GET'
@@ -589,23 +612,25 @@ export const getPlayerDetails = async (playerSlug: string, options?: Parameters<
 
 
 
-export const getGetPlayerDetailsQueryKey = (playerSlug: string,) => {
+export const getGetPlayerDetailsQueryKey = (playerSlug: string,
+    params?: GetPlayerDetailsParams,) => {
     return [
-    `/api/players/${playerSlug}`
+    `/api/players/${playerSlug}`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetPlayerDetailsQueryOptions = <TData = Awaited<ReturnType<typeof getPlayerDetails>>, TError = ErrorType<ErrorResponse>>(playerSlug: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPlayerDetails>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetPlayerDetailsQueryOptions = <TData = Awaited<ReturnType<typeof getPlayerDetails>>, TError = ErrorType<ErrorResponse>>(playerSlug: string,
+    params?: GetPlayerDetailsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPlayerDetails>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetPlayerDetailsQueryKey(playerSlug);
+  const queryKey =  queryOptions?.queryKey ?? getGetPlayerDetailsQueryKey(playerSlug,params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPlayerDetails>>> = ({ signal }) => getPlayerDetails(playerSlug, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPlayerDetails>>> = ({ signal }) => getPlayerDetails(playerSlug,params, { signal, ...requestOptions });
 
 
 
@@ -619,15 +644,16 @@ export type GetPlayerDetailsQueryError = ErrorType<ErrorResponse>
 
 
 /**
- * @summary Get BeSoccer player profile and tab data
+ * @summary Get a BeSoccer player profile and the selected tab
  */
 
 export function useGetPlayerDetails<TData = Awaited<ReturnType<typeof getPlayerDetails>>, TError = ErrorType<ErrorResponse>>(
- playerSlug: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPlayerDetails>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ playerSlug: string,
+    params?: GetPlayerDetailsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPlayerDetails>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetPlayerDetailsQueryOptions(playerSlug,options)
+  const queryOptions = getGetPlayerDetailsQueryOptions(playerSlug,params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

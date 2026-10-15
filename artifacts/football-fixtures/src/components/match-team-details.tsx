@@ -74,10 +74,10 @@ export function MatchTeamDetails({
   const selectedSlug = selectedSide === 'home' ? homeTeamSlug : awayTeamSlug;
   const selectedName = selectedSide === 'home' ? fixture.homeTeam : fixture.awayTeam;
   const selectedBadge = selectedSide === 'home' ? fixture.homeBadgeUrl : fixture.awayBadgeUrl;
-  const teamQuery = useGetTeamDetails(selectedSlug || '', {
+  const teamQuery = useGetTeamDetails(selectedSlug || '', { tab: 'in-depth' }, {
     query: {
       enabled: Boolean(selectedSlug),
-      queryKey: getGetTeamDetailsQueryKey(selectedSlug || ''),
+      queryKey: getGetTeamDetailsQueryKey(selectedSlug || '', { tab: 'in-depth' }),
       staleTime: 120_000,
       refetchOnMount: true,
       refetchOnWindowFocus: false,

@@ -30,7 +30,6 @@ const rawHtmlWaiters: Array<() => void> = [];
 let activeRawHtmlRequests = 0;
 const knownFixtures = new Map<string, Fixture>();
 const knownMatchPaths = new Map<string, string>();
-const knownCompetitionKeys = new Map<string, string>();
 const knownOddsMatchKeys = new Map<
   string,
   { year: string; sourceMatchId: string; sourceRegion: string | null }
@@ -472,43 +471,10 @@ function getCompetitionKeyAt(
   return selected;
 }
 
-function competitionKeyFromMatchPage(markdown: string): string | null {
-  const match = markdown.match(
-    /\]\(https?:\/\/www\.besoccer\.com(\/competition\/scores\/[^)\s]+)\)/i,
-  );
-  return competitionKeyFromPath(match?.[1] ?? "");
-}
-
 function parseNumber(value: string | undefined): number | null {
   if (!value) return null;
   const parsed = Number(value.replace(/[+º°]/g, ""));
   return Number.isFinite(parsed) ? parsed : null;
-}
-
-function roundFixtureDates(matchDate: string): string[] {
-  const date = new Date(`${matchDate.slice(0, 10)}T00:00:00.000Z`);
-  if (Number.isNaN(date.getTime())) return [matchDate.slice(0, 10)];
-
-  const weekday = date.getUTCDay();
-  const isWeekendRound = [0, 1, 5, 6].includes(weekday);
-  const startOffset = isWeekendRound
-    ? (weekday + 2) % 7
-    : weekday - 2;
-  date.setUTCDate(date.getUTCDate() - startOffset);
-  const dayCount = isWeekendRound ? 4 : 3;
-  return Array.from({ length: dayCount }, (_, index) => {
-    const day = new Date(date);
-    day.setUTCDate(day.getUTCDate() + index);
-    return day.toISOString().slice(0, 10);
-  });
-}
-
-function normalizeCompetition(name: string): string {
-  return name
-    .replace(/\s+round\s+\d+.*$/i, "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .toLowerCase();
 }
 
 const monthNumbers: Record<string, string> = {
@@ -1468,16 +1434,6 @@ export async function getMatchOdds(
   return result;
 }
 
-const sourcePageTabs = [
-  "rounds",
-  "table",
-  "analysis",
-  "preview",
-  "lineups",
-  "odds",
-  "events",
-] as const;
-
 function isPageChrome(line: string): boolean {
   const text = cleanMarkdown(line).toLowerCase();
   return (
@@ -1682,8 +1638,6 @@ export async function listFixturesForDate(date: string): Promise<FixtureList> {
   ];
   for (const fixture of fixtures) {
     knownFixtures.set(fixture.id, fixture);
-    const competitionKey = competitionKeys.get(fixture.id);
-    if (competitionKey) knownCompetitionKeys.set(fixture.id, competitionKey);
     try {
       const sourcePath = new URL(fixture.sourceUrl).pathname;
       if (/^\/match\/[a-z0-9-]+\/[a-z0-9-]+\/\d+$/i.test(sourcePath)) {
@@ -1707,53 +1661,49 @@ export async function listFixturesForDate(date: string): Promise<FixtureList> {
 export async function getMatchById(
   matchId: string,
   requestedPath?: string,
+  requestedSection:
+    | "rounds"
+    | "standings"
+    | "analysis"
+    | "preview"
+    | "lineups"
+    | "events" = "rounds",
 ): Promise<MatchDetails> {
   const matchPath = sourcePathForMatch(matchId, requestedPath);
-  const matchCacheKey = `match:${matchPath}`;
+  const section = requestedSection;
+  const sourceTab = section === "standings" ? "table" : section;
+  const matchCacheKey = `match:${matchPath}:${section}`;
   const cached = fromCache<MatchDetails>(matchCacheKey);
   if (cached) return cached;
 
-  const pages = sourcePageTabs.map((tab) => `${matchPath}/${tab}`);
-  const pageResults = await Promise.allSettled([
+  const [mainMarkdown, selectedSource] = await Promise.all([
     getMarkdown(matchPath),
-    ...pages.map((path) => getMarkdown(path)),
-    getRawHtml(`${matchPath}/table`),
+    section === "standings"
+      ? getRawHtml(`${matchPath}/table`)
+      : getMarkdown(`${matchPath}/${sourceTab}`),
   ]);
-  const mainResult = pageResults[0];
-  if (!mainResult || mainResult.status === "rejected") {
-    throw mainResult?.reason ?? new Error("The match source did not respond");
-  }
-
-  const sectionResults = pageResults.slice(1, pages.length + 1);
-  const tableHtmlResult = pageResults[pages.length + 1];
-  const tableHtml =
-    tableHtmlResult?.status === "fulfilled" ? tableHtmlResult.value : "";
-  const mainMarkdown = mainResult.value;
-  const sectionMarkdown = sectionResults.map((result) =>
-    result.status === "fulfilled" ? result.value : "",
-  );
-  const [
-    roundMarkdown,
-    tableMarkdown,
-    analysisMarkdown,
-    previewMarkdown,
-    lineupMarkdown,
-    oddsMarkdown,
-    eventMarkdown,
-  ] = sectionMarkdown;
+  const tableHtml = section === "standings" ? selectedSource : "";
+  const selectedMarkdown = section === "standings" ? "" : selectedSource;
+  const roundMarkdown = section === "rounds" ? selectedMarkdown : "";
+  const analysisMarkdown = section === "analysis" ? selectedMarkdown : "";
+  const previewMarkdown = section === "preview" ? selectedMarkdown : "";
+  const lineupMarkdown = section === "lineups" ? selectedMarkdown : "";
+  const eventMarkdown = section === "events" ? selectedMarkdown : "";
   const knownFixture = knownFixtures.get(matchId);
-  const sourceCompetitionKey = competitionKeyFromMatchPage(mainMarkdown);
   const matchDate =
     knownFixture?.kickoff.slice(0, 10) ??
     inferMatchDate(mainMarkdown) ??
     new Date().toISOString().slice(0, 10);
   const roundInfo = parseRound(roundMarkdown ?? "");
-  let roundMatches = parseFixtureLinks(
-    roundMarkdown ?? "",
-    matchDate,
-    roundInfo.competition,
-    roundInfo.round,
-  );
+  let roundMatches =
+    section === "rounds"
+      ? parseFixtureLinks(
+          roundMarkdown,
+          matchDate,
+          roundInfo.competition,
+          roundInfo.round,
+        )
+      : [];
   const pageFixture = parseMatchFixture(
     mainMarkdown,
     matchPath,
@@ -1810,96 +1760,67 @@ export async function getMatchById(
     round: fixture.round ?? roundInfo.round,
   };
 
-  const roundDateResults = await Promise.allSettled(
-    roundFixtureDates(fixture.kickoff).map((date) => listFixturesForDate(date)),
-  );
-  const roundFixturesById = new Map<string, Fixture>();
-  for (const dateResult of roundDateResults) {
-    if (dateResult.status !== "fulfilled") continue;
-    for (const candidate of dateResult.value.fixtures) {
-      const candidateCompetitionKey = knownCompetitionKeys.get(candidate.id);
-      const belongsToCompetition =
-        sourceCompetitionKey && candidateCompetitionKey
-          ? candidateCompetitionKey === sourceCompetitionKey
-          : normalizeCompetition(candidate.competition) ===
-            normalizeCompetition(fixture.competition);
-      if (belongsToCompetition) {
-        roundFixturesById.set(candidate.id, {
-          ...candidate,
-          competition: fixture.competition,
-          round: fixture.round,
-        });
-      }
-    }
+  if (section === "rounds") {
+    const roundFixturesById = new Map(
+      roundMatches.map((item) => [item.id, { ...item, competition: fixture.competition, round: fixture.round }]),
+    );
+    roundFixturesById.set(fixture.id, fixture);
+    roundMatches = Array.from(roundFixturesById.values()).sort((a, b) =>
+      a.kickoff.localeCompare(b.kickoff),
+    );
   }
-  roundFixturesById.set(fixture.id, fixture);
-  roundMatches = Array.from(roundFixturesById.values()).sort((a, b) =>
-    a.kickoff.localeCompare(b.kickoff),
-  );
 
-  const sourcePages: MatchContentPage[] = sourcePageTabs.map((tab, index) => {
-    const result = sectionResults[index];
-    const sourceUrl = `${besoccerOrigin}${matchPath}/${tab}`;
-    return {
-      tab,
-      sourceUrl,
-      sections: result?.status === "fulfilled"
-        ? parseSourceSections(result.value)
-        : [{
-            title: "Source section unavailable",
-            text: ["BeSoccer did not return this section for the current request."],
-            tables: [],
-          }],
-    };
-  });
-
-  const odds = Array.from(
-    new Map(
-      [mainMarkdown, oddsMarkdown ?? "", ...sectionMarkdown]
-        .flatMap((markdown) =>
-          markdown ? parseOdds(markdown, `${besoccerOrigin}${matchPath}/odds`) : [],
-        )
-        .map((entry) => [entry.bookmaker, entry]),
-    ).values(),
-  );
-  const parsedStandings = parseStandings(tableMarkdown ?? "");
   const parsedHtmlStandings = parseStandingRowsFromHtml(
     tableHtml,
     "tab_total0",
   );
-  const standingsPage = parseStandingsPage(tableHtml);
+  const standingsPage =
+    section === "standings" ? parseStandingsPage(tableHtml) : null;
+  const sourcePages: MatchContentPage[] =
+    section === "standings"
+      ? []
+      : [
+          {
+            tab: sourceTab,
+            sourceUrl: `${besoccerOrigin}${matchPath}/${sourceTab}`,
+            sections: parseSourceSections(selectedMarkdown),
+          },
+        ];
   const result: MatchDetails = {
     fixture,
     sourceUrl: `${besoccerOrigin}${matchPath}`,
     fetchedAt: new Date(),
     roundMatches,
-    standings:
-      parsedHtmlStandings.length > 0 ? parsedHtmlStandings : parsedStandings,
-    homeStandings: parseStandingRowsFromHtml(tableHtml, "tab_local0"),
-    awayStandings: parseStandingRowsFromHtml(tableHtml, "tab_visitor0"),
-    currentStandingsRound: standingsPage.currentRound,
-    standingsRoundOptions: standingsPage.options,
-    analysisStats: parseAnalysis(analysisMarkdown ?? ""),
-    matchStatistics: parseMatchStatistics(eventMarkdown ?? ""),
+    standings: section === "standings" ? parsedHtmlStandings : [],
+    homeStandings:
+      section === "standings"
+        ? parseStandingRowsFromHtml(tableHtml, "tab_local0")
+        : [],
+    awayStandings:
+      section === "standings"
+        ? parseStandingRowsFromHtml(tableHtml, "tab_visitor0")
+        : [],
+    currentStandingsRound: standingsPage?.currentRound ?? null,
+    standingsRoundOptions: standingsPage?.options ?? [],
+    analysisStats: analysisMarkdown ? parseAnalysis(analysisMarkdown) : [],
+    matchStatistics: eventMarkdown ? parseMatchStatistics(eventMarkdown) : [],
     previewFacts: parsePreview(
       previewMarkdown ?? "",
       fixture.homeTeam,
       fixture.awayTeam,
     ),
-    lineups: parseLineups(
-      lineupMarkdown ?? "",
-      fixture.homeTeam,
-      fixture.awayTeam,
-    ),
-    events: parseEvents(
-      eventMarkdown ?? "",
-      fixture.homeTeam,
-      fixture.awayTeam,
-    ),
-    odds,
+    lineups:
+      section === "lineups"
+        ? parseLineups(lineupMarkdown, fixture.homeTeam, fixture.awayTeam)
+        : [],
+    events:
+      section === "events"
+        ? parseEvents(eventMarkdown, fixture.homeTeam, fixture.awayTeam)
+        : [],
+    odds: [],
     sourcePages,
   };
-  saveCache(matchCacheKey, result, 120_000);
+  saveCache(matchCacheKey, result, 90_000);
   return result;
 }
 
@@ -2826,70 +2747,75 @@ function parsePlayerProfile(html: string, slug: string): PlayerProfile {
   };
 }
 
-export async function getPlayerDetails(playerSlug: string): Promise<PlayerDetails> {
-  const cached = fromCache<PlayerDetails>(`player:${playerSlug}`);
+export async function getPlayerDetails(
+  playerSlug: string,
+  selectedTab: PlayerContentPageTab = "info",
+): Promise<PlayerDetails> {
+  const cacheKey = `player:${playerSlug}:${selectedTab}`;
+  const cached = fromCache<PlayerDetails>(cacheKey);
   if (cached) return cached;
 
-  const results = await Promise.allSettled(
-    playerPageSources.map(({ suffix }) =>
-      getRawHtml(playerProfilePath(playerSlug, suffix)),
-    ),
-  );
-  const infoResult = results[0];
-  if (!infoResult || infoResult.status === "rejected") {
-    throw infoResult?.reason ?? new Error("Player profile is not available");
-  }
-
-  const pages: PlayerContentPage[] = playerPageSources.map((source, index) => {
-    const result = results[index];
-    return {
+  const infoHtml = await getRawHtml(playerProfilePath(playerSlug, ""));
+  const source = playerPageSources.find((page) => page.tab === selectedTab);
+  if (!source) throw new Error("Player section is not available");
+  const pageHtml =
+    selectedTab === "info"
+      ? infoHtml
+      : await getRawHtml(playerProfilePath(playerSlug, source.suffix));
+  const pages: PlayerContentPage[] = [
+    {
       tab: source.tab,
       sourceUrl: `${besoccerOrigin}${playerProfilePath(playerSlug, source.suffix)}`,
-      sections:
-        result?.status === "fulfilled"
-          ? parseHtmlModuleSections(
-              result.value,
-              playerModuleTitles,
-              ignoredPlayerModules,
-            )
-          : [],
-    };
-  });
-  const result = { player: parsePlayerProfile(infoResult.value, playerSlug), pages };
-  saveCache(`player:${playerSlug}`, result, 120_000);
+      sections: parseHtmlModuleSections(
+        pageHtml,
+        playerModuleTitles,
+        ignoredPlayerModules,
+      ),
+    },
+  ];
+  const result = { player: parsePlayerProfile(infoHtml, playerSlug), pages };
+  saveCache(cacheKey, result, 90_000);
   return result;
 }
 
-export async function getTeamDetails(teamSlug: string): Promise<TeamDetails> {
-  const cached = fromCache<TeamDetails>(`team:${teamSlug}`);
+export async function getTeamDetails(
+  teamSlug: string,
+  selectedTab: TeamContentPageTab | "in-depth" = "info",
+): Promise<TeamDetails> {
+  const cacheKey = `team:${teamSlug}:${selectedTab}`;
+  const cached = fromCache<TeamDetails>(cacheKey);
   if (cached) return cached;
 
-  const results = await Promise.allSettled(
-    teamPageSources.map(({ suffix }) =>
-      getRawHtml(teamProfilePath(teamSlug, suffix)),
-    ),
+  const infoHtml = await getRawHtml(teamProfilePath(teamSlug, ""));
+  const team = parseTeamProfile(infoHtml, teamSlug);
+  const source = teamPageSources.find((page) =>
+    selectedTab === "in-depth" ? page.tab === "matches" : page.tab === selectedTab,
   );
-  const infoResult = results[0];
-  if (!infoResult || infoResult.status === "rejected") {
-    throw infoResult?.reason ?? new Error("Team profile is not available");
+  if (!source) throw new Error("Team section is not available");
+  const pageHtml =
+    selectedTab === "info"
+      ? infoHtml
+      : await getRawHtml(teamProfilePath(teamSlug, source.suffix));
+  const page: TeamContentPage = {
+    tab: source.tab,
+    sourceUrl: `${besoccerOrigin}${teamProfilePath(teamSlug, source.suffix)}`,
+    sections: parseTeamSections(pageHtml, teamSlug, source.tab),
+  };
+  if (selectedTab !== "in-depth") {
+    const result: TeamDetails = {
+      team,
+      pages: [page],
+      recentMatches: [],
+      nextMatch: null,
+      eloAnalysisMatch: null,
+      eloAnalysisStats: [],
+    };
+    saveCache(cacheKey, result, 90_000);
+    return result;
   }
 
-  const pages: TeamContentPage[] = teamPageSources.map((source, index) => {
-    const result = results[index];
-    return {
-      tab: source.tab,
-      sourceUrl: `${besoccerOrigin}${teamProfilePath(teamSlug, source.suffix)}`,
-      sections:
-        result?.status === "fulfilled"
-          ? parseTeamSections(result.value, teamSlug, source.tab)
-          : [],
-    };
-  });
-  const matchesResult = results[1];
   const today = new Date().toISOString().slice(0, 10);
-  const matchFixtures = matchesResult?.status === "fulfilled"
-    ? parseFixtureCards(matchesResult.value, today)
-    : [];
+  const matchFixtures = parseFixtureCards(pageHtml, today);
   const uniqueMatchFixtures = Array.from(
     new Map(matchFixtures.map((fixture) => [fixture.id, fixture])).values(),
   );
@@ -2936,14 +2862,14 @@ export async function getTeamDetails(teamSlug: string): Promise<TeamDetails> {
   const eloAnalysisStats =
     eloResult?.status === "fulfilled" ? eloResult.value.stats : [];
   const result = {
-    team: parseTeamProfile(infoResult.value, teamSlug),
-    pages,
+    team,
+    pages: [page],
     recentMatches,
     nextMatch,
     eloAnalysisMatch,
     eloAnalysisStats,
   };
-  saveCache(`team:${teamSlug}`, result, 120_000);
+  saveCache(cacheKey, result, 90_000);
   return result;
 }
 

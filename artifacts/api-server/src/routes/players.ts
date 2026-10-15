@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import {
   GetPlayerDetailsParams,
+  GetPlayerDetailsQueryParams,
   GetPlayerDetailsResponse,
 } from "@workspace/api-zod";
 import { getPlayerDetails } from "../lib/besoccer";
@@ -14,8 +15,14 @@ router.get("/players/:playerSlug", async (req, res): Promise<void> => {
     return;
   }
 
+  const query = GetPlayerDetailsQueryParams.safeParse(req.query);
+  if (!query.success) {
+    res.status(400).json({ error: "A valid player page is required." });
+    return;
+  }
+
   try {
-    const details = await getPlayerDetails(params.data.playerSlug);
+    const details = await getPlayerDetails(params.data.playerSlug, query.data.tab);
     res.json(GetPlayerDetailsResponse.parse(details));
   } catch (error) {
     req.log.error(

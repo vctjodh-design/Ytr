@@ -352,7 +352,23 @@ export type GetMatchDetailsParams = {
  * Canonical BeSoccer match path copied from the fixture link
  */
 sourcePath?: string;
+/**
+ * Load only the selected match section
+ */
+section?: GetMatchDetailsSection;
 };
+
+export type GetMatchDetailsSection = typeof GetMatchDetailsSection[keyof typeof GetMatchDetailsSection];
+
+
+export const GetMatchDetailsSection = {
+  rounds: 'rounds',
+  standings: 'standings',
+  analysis: 'analysis',
+  preview: 'preview',
+  lineups: 'lineups',
+  events: 'events',
+} as const;
 
 export type GetMatchOddsParams = {
 marketId: GetMatchOddsMarketId;
@@ -389,4 +405,49 @@ round: number;
  */
 sourcePath?: string;
 };
+
+export type GetTeamDetailsParams = {
+/**
+ * Load only the selected team page; in-depth loads recent form and ratings
+ */
+tab?: GetTeamDetailsTab;
+};
+
+export type GetTeamDetailsTab = typeof GetTeamDetailsTab[keyof typeof GetTeamDetailsTab];
+
+
+export const GetTeamDetailsTab = {
+  info: 'info',
+  matches: 'matches',
+  transfers: 'transfers',
+  squad: 'squad',
+  standings: 'standings',
+  career: 'career',
+  competitions: 'competitions',
+  'injuries-suspensions': 'injuries-suspensions',
+  honours: 'honours',
+  historical: 'historical',
+  'in-depth': 'in-depth',
+} as const;
+
+export type GetPlayerDetailsParams = {
+/**
+ * Load only the selected player page
+ */
+tab?: GetPlayerDetailsTab;
+};
+
+export type GetPlayerDetailsTab = typeof GetPlayerDetailsTab[keyof typeof GetPlayerDetailsTab];
+
+
+export const GetPlayerDetailsTab = {
+  info: 'info',
+  matches: 'matches',
+  career: 'career',
+  achievements: 'achievements',
+  milestones: 'milestones',
+  attributes: 'attributes',
+  transfers: 'transfers',
+  teammates: 'teammates',
+} as const;
 

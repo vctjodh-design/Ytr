@@ -28,6 +28,16 @@ import { TeamCrest } from '@/components/team-crest';
 const tabs = ['Rounds', 'Standings', 'Analysis', 'Team Details', 'Preview', 'Lineups', 'Odds', 'Events'] as const;
 type Tab = typeof tabs[number];
 type StandingScope = 'overall' | 'home' | 'away';
+const sectionByTab = {
+  Rounds: 'rounds',
+  Standings: 'standings',
+  Analysis: 'analysis',
+  'Team Details': 'rounds',
+  Preview: 'preview',
+  Lineups: 'lineups',
+  Odds: 'rounds',
+  Events: 'events',
+} as const;
 
 function formatKickoff(kickoff: string) {
   const date = new Date(kickoff);
@@ -577,20 +587,44 @@ export default function MatchPage() {
     ? { sourcePath: `/match/${homeSlug}/${awaySlug}/${matchId}` }
     : undefined;
   const [tab, setTab] = useState<Tab>('Rounds');
-  const { data, isLoading, isError, refetch, isFetching } = useGetMatchDetails(
+  const baseParams = { ...(requestParams ?? {}), section: 'rounds' as const };
+  const activeParams = {
+    ...(requestParams ?? {}),
+    section: sectionByTab[tab],
+  };
+  const baseQuery = useGetMatchDetails(
     matchId,
-    requestParams,
+    baseParams,
     {
       query: {
         enabled: Boolean(matchId),
-        queryKey: getGetMatchDetailsQueryKey(matchId, requestParams),
-        staleTime: 0,
-        refetchOnMount: 'always',
+        queryKey: getGetMatchDetailsQueryKey(matchId, baseParams),
+        staleTime: 90_000,
         refetchOnWindowFocus: false,
-        retry: 2,
+        retry: 1,
       },
     },
   );
+  const sectionQuery = useGetMatchDetails(matchId, activeParams, {
+    query: {
+      enabled: Boolean(matchId) && tab !== 'Rounds' && tab !== 'Odds' && tab !== 'Team Details',
+      queryKey: getGetMatchDetailsQueryKey(matchId, activeParams),
+      staleTime: 90_000,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  });
+  const data = baseQuery.data;
+  const tabDetails = tab === 'Rounds' || tab === 'Odds' || tab === 'Team Details'
+    ? data
+    : sectionQuery.data ?? data;
+  const activeQuery = tab === 'Rounds' || tab === 'Odds' || tab === 'Team Details'
+    ? baseQuery
+    : sectionQuery;
+  const isLoading = baseQuery.isLoading;
+  const isError = baseQuery.isError;
+  const refetch = activeQuery.refetch;
+  const isFetching = activeQuery.isFetching;
   const fixture = data?.fixture;
   const sourceUrl = data?.sourceUrl || fixture?.sourceUrl;
 
@@ -736,15 +770,30 @@ export default function MatchPage() {
                 </div>
                 <span className="data-source">{tab.toUpperCase()} / SOURCE DATA</span>
               </div>
-              <TabContent
-                tab={tab}
-                details={data}
-                matchId={matchId}
-                sourcePath={requestParams?.sourcePath}
-                selectedDate={fixture.kickoff.slice(0, 10)}
-                homeTeamSlug={homeSlug ?? teamSlugFromMatchSource(fixture.sourceUrl, 'home')}
-                awayTeamSlug={awaySlug ?? teamSlugFromMatchSource(fixture.sourceUrl, 'away')}
-              />
+              {tab !== 'Rounds' && tab !== 'Odds' && tab !== 'Team Details' && sectionQuery.isLoading ? (
+                <div className="match-tab-loading" role="status" data-testid="status-match-tab-loading">
+                  <span className="team-loading-bar" />
+                  <strong>Loading {tab.toLowerCase()} from the source…</strong>
+                </div>
+              ) : tab !== 'Rounds' && tab !== 'Odds' && tab !== 'Team Details' && sectionQuery.isError ? (
+                <div className="error-panel" role="alert" data-testid="status-match-tab-error">
+                  <CircleAlert size={20} />
+                  <div><strong>{tab} unavailable.</strong><p>The source section could not be loaded.</p></div>
+                  <button type="button" onClick={() => sectionQuery.refetch()} disabled={sectionQuery.isFetching}>
+                    {sectionQuery.isFetching ? 'Retrying' : 'Try again'}
+                  </button>
+                </div>
+              ) : (
+                <TabContent
+                  tab={tab}
+                  details={tabDetails ?? data}
+                  matchId={matchId}
+                  sourcePath={requestParams?.sourcePath}
+                  selectedDate={fixture.kickoff.slice(0, 10)}
+                  homeTeamSlug={homeSlug ?? teamSlugFromMatchSource(fixture.sourceUrl, 'home')}
+                  awayTeamSlug={awaySlug ?? teamSlugFromMatchSource(fixture.sourceUrl, 'away')}
+                />
+              )}
             </section>
             <footer className="page-foot match-foot">
               <span>TOUCHLINE DESK <b>·</b> {fixture.id}</span>

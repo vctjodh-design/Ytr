@@ -41,17 +41,31 @@ export default function PlayerPage() {
   const { playerSlug = '' } = useParams<{ playerSlug: string }>();
   const [tab, setTab] = useState<PlayerContentPageTab>('info');
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
-  const { data, isLoading, isError, refetch, isFetching } = useGetPlayerDetails(playerSlug, {
+  const profileQuery = useGetPlayerDetails(playerSlug, { tab: 'info' }, {
     query: {
       enabled: Boolean(playerSlug),
-      queryKey: getGetPlayerDetailsQueryKey(playerSlug),
-      staleTime: 0,
-      refetchOnMount: 'always',
+      queryKey: getGetPlayerDetailsQueryKey(playerSlug, { tab: 'info' }),
+      staleTime: 90_000,
       refetchOnWindowFocus: false,
-      retry: 2,
+      retry: 1,
     },
   });
-  const player = data?.player;
+  const sectionQuery = useGetPlayerDetails(playerSlug, { tab }, {
+    query: {
+      enabled: Boolean(playerSlug) && tab !== 'info',
+      queryKey: getGetPlayerDetailsQueryKey(playerSlug, { tab }),
+      staleTime: 90_000,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  });
+  const activeQuery = tab === 'info' ? profileQuery : sectionQuery;
+  const data = activeQuery.data;
+  const isLoading = profileQuery.isLoading;
+  const isError = profileQuery.isError;
+  const refetch = activeQuery.refetch;
+  const isFetching = activeQuery.isFetching;
+  const player = profileQuery.data?.player ?? data?.player;
   const page = data?.pages?.find((item) => item.tab === tab);
   const sourceLink = validHttpUrl(player?.sourceUrl);
   const activeTabIndex = tabs.findIndex((item) => item.id === tab);
@@ -122,7 +136,7 @@ export default function PlayerPage() {
               {isFetching ? 'Retrying' : 'Try again'}
             </button>
           </div>
-        ) : !data || !player ? (
+        ) : !profileQuery.data || !player ? (
           <SectionEmpty
             title="Player file not found"
             detail="No player record was returned for this address. Check the link or return to fixtures."
@@ -248,7 +262,19 @@ export default function PlayerPage() {
                 </div>
                 <span className="player-source-note">{tab.toUpperCase()} / API-PROVIDED CONTENT</span>
               </header>
-              {page ? (
+              {tab !== 'info' && sectionQuery.isLoading ? (
+                <div className="player-loading" role="status" data-testid="status-player-tab-loading">
+                  <div className="player-skeleton-copy"><span /><span /><span /></div>
+                </div>
+              ) : tab !== 'info' && sectionQuery.isError ? (
+                <div className="error-panel player-error" role="alert" data-testid="status-player-tab-error">
+                  <CircleAlert size={20} />
+                  <div><strong>This section is unavailable.</strong><p>The source page could not be loaded.</p></div>
+                  <button type="button" onClick={() => sectionQuery.refetch()} disabled={sectionQuery.isFetching}>
+                    {sectionQuery.isFetching ? 'Retrying' : 'Try again'}
+                  </button>
+                </div>
+              ) : page ? (
                 <MatchSourceContent page={page} tab={tabs[activeTabIndex]?.label || tab} />
               ) : (
                 <SectionEmpty

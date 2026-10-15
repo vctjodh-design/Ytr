@@ -121,6 +121,7 @@ router.get("/matches/:matchId", async (req, res): Promise<void> => {
     const details = await getMatchById(
       params.data.matchId,
       query.data.sourcePath,
+      query.data.section,
     );
     res.json(GetMatchDetailsResponse.parse(details));
   } catch (error) {

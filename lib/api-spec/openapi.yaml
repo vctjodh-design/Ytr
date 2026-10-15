@@ -59,7 +59,7 @@ paths:
     get:
       operationId: getMatchDetails
       tags: [fixtures]
-      summary: Get all available details for a BeSoccer match
+      summary: Get match details and the selected BeSoccer section
       parameters:
         - name: matchId
           in: path
@@ -73,6 +73,13 @@ paths:
           description: Canonical BeSoccer match path copied from the fixture link
           schema:
             type: string
+        - name: section
+          in: query
+          required: false
+          description: Load only the selected match section
+          schema:
+            type: string
+            enum: [rounds, standings, analysis, preview, lineups, events]
       responses:
         "200":
           description: Match tabs parsed from BeSoccer
@@ -189,7 +196,7 @@ paths:
     get:
       operationId: getTeamDetails
       tags: [teams]
-      summary: Get BeSoccer team profile and tab data
+      summary: Get a BeSoccer team profile and the selected tab
       parameters:
         - name: teamSlug
           in: path
@@ -197,6 +204,13 @@ paths:
           schema:
             type: string
             pattern: "^[a-z0-9-]+$"
+        - name: tab
+          in: query
+          required: false
+          description: Load only the selected team page; in-depth loads recent form and ratings
+          schema:
+            type: string
+            enum: [info, matches, transfers, squad, standings, career, competitions, injuries-suspensions, honours, historical, in-depth]
       responses:
         "200":
           description: Team profile, fixtures, transfers, squad, standings, media, and news
@@ -220,7 +234,7 @@ paths:
     get:
       operationId: getPlayerDetails
       tags: [players]
-      summary: Get BeSoccer player profile and tab data
+      summary: Get a BeSoccer player profile and the selected tab
       parameters:
         - name: playerSlug
           in: path
@@ -228,6 +242,13 @@ paths:
           schema:
             type: string
             pattern: "^[a-z0-9-]+$"
+        - name: tab
+          in: query
+          required: false
+          description: Load only the selected player page
+          schema:
+            type: string
+            enum: [info, matches, career, achievements, milestones, attributes, transfers, teammates]
       responses:
         "200":
           description: Player profile with info, matches, career, achievements, milestones, attributes, transfers, and teammates
