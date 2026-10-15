@@ -2814,6 +2814,27 @@ export async function getTeamDetails(
     return result;
   }
 
+  const dossierSources = teamPageSources.filter(
+    (candidate) => candidate.tab === "squad" || candidate.tab === "standings",
+  );
+  const dossierPages = await Promise.all(
+    dossierSources.map(async (candidate): Promise<TeamContentPage> => {
+      const html = await getRawHtml(
+        teamProfilePath(teamSlug, candidate.suffix),
+      );
+      return {
+        tab: candidate.tab,
+        sourceUrl: `${besoccerOrigin}${teamProfilePath(teamSlug, candidate.suffix)}`,
+        sections: parseTeamSections(html, teamSlug, candidate.tab),
+      };
+    }),
+  );
+  const infoPage: TeamContentPage = {
+    tab: "info",
+    sourceUrl: `${besoccerOrigin}${teamProfilePath(teamSlug, "")}`,
+    sections: parseTeamSections(infoHtml, teamSlug, "info"),
+  };
+
   const today = new Date().toISOString().slice(0, 10);
   const matchFixtures = parseFixtureCards(pageHtml, today);
   const uniqueMatchFixtures = Array.from(
@@ -2863,7 +2884,7 @@ export async function getTeamDetails(
     eloResult?.status === "fulfilled" ? eloResult.value.stats : [];
   const result = {
     team,
-    pages: [page],
+    pages: [infoPage, ...dossierPages, page],
     recentMatches,
     nextMatch,
     eloAnalysisMatch,
