@@ -2,6 +2,7 @@ import { ExternalLink, Minus } from 'lucide-react';
 import type { Fixture, MatchContentSection, MatchStat, TeamDetails } from '@workspace/api-client-react';
 import { Link } from 'wouter';
 import { OddsPanel } from '@/components/odds-panel';
+import { SourceInlineImages } from '@/components/source-inline-images';
 
 type Props = {
   details: TeamDetails;
@@ -156,7 +157,7 @@ function SourceSection({ section }: { section: MatchContentSection }) {
             if (block.type === 'image' && block.imageUrl) {
               const image = (
                 <figure className="in-depth-source-image" key={`image-${index}`}>
-                  <img src={block.imageUrl} alt={block.imageAlt || ''} loading="lazy" />
+                  <img className="source-image-asset" src={block.imageUrl} alt={block.imageAlt || ''} loading="lazy" />
                   {block.imageAlt && <figcaption>{block.imageAlt}</figcaption>}
                 </figure>
               );
@@ -199,22 +200,32 @@ function SourceSection({ section }: { section: MatchContentSection }) {
                       </thead>
                     ) : null}
                     <tbody>
-                      {block.rows?.map((row, rowIndex) => (
+                      {block.rows?.map((row, rowIndex) => block.rowTypes?.[rowIndex] === 'section' ? (
+                        <tr className="source-table-section-row" key={`row-${rowIndex}`}>
+                          <th colSpan={Math.max(block.headers?.length ?? 0, 1)}>{row[0]}</th>
+                        </tr>
+                      ) : (
                         <tr key={`row-${rowIndex}`}>
                           {row.map((value, cellIndex) => {
-                            const playerSlug = block.playerSlugs?.[rowIndex]?.[cellIndex];
-                            const coachSlug = block.coachSlugs?.[rowIndex]?.[cellIndex];
+                            const playerSlug = block.playerSlugs?.[rowIndex]?.[cellIndex] || undefined;
+                            const coachSlug = block.coachSlugs?.[rowIndex]?.[cellIndex] || undefined;
+                            const images = block.cellImages?.[rowIndex]?.[cellIndex];
                             return (
                               <td key={`${cellIndex}-${value}`}>
-                                {playerSlug ? (
-                                  <Link className="in-depth-player-link" href={`/player/${encodeURIComponent(playerSlug)}`} data-testid={`link-source-player-${playerSlug}`}>
-                                    {value}
-                                  </Link>
-                                ) : coachSlug ? (
-                                  <a className="in-depth-player-link" href={`https://www.besoccer.com/coach/${encodeURIComponent(coachSlug)}`} target="_blank" rel="noreferrer">
-                                    {value}
-                                  </a>
-                                ) : value}
+                                <div className="source-table-cell">
+                                  <SourceInlineImages images={images} playerSlug={playerSlug} coachSlug={coachSlug} />
+                                  {value ? (
+                                    playerSlug ? (
+                                      <Link className="in-depth-player-link" href={`/player/${encodeURIComponent(playerSlug)}`} data-testid={`link-source-player-${playerSlug}`}>
+                                        {value}
+                                      </Link>
+                                    ) : coachSlug ? (
+                                      <a className="in-depth-player-link" href={`https://www.besoccer.com/coach/${encodeURIComponent(coachSlug)}`} target="_blank" rel="noreferrer">
+                                        {value}
+                                      </a>
+                                    ) : <span>{value}</span>
+                                  ) : null}
+                                </div>
                               </td>
                             );
                           })}
@@ -227,7 +238,8 @@ function SourceSection({ section }: { section: MatchContentSection }) {
             }
             if (!block.text) return null;
             return (
-              <p className="in-depth-source-copy" key={`text-${index}`}>
+              <p className={`in-depth-source-copy${block.images?.length ? ' has-inline-images' : ''}`} key={`text-${index}`}>
+                <SourceInlineImages images={block.images} playerSlug={block.playerSlug} coachSlug={block.coachSlug} />
                 {block.playerSlug ? (
                   <Link className="in-depth-player-link" href={`/player/${encodeURIComponent(block.playerSlug)}`} data-testid={`link-source-player-${block.playerSlug}`}>
                     {block.text}

@@ -4335,3 +4335,77 @@ a {
   .player-error > div { min-width: calc(100% - 45px); }
   .player-error button { margin-left: 35px; }
 }
+
+.source-table-cell {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+}
+
+.source-inline-images {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+}
+
+.source-inline-image-link {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+}
+
+.source-inline-image {
+  display: block;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  object-fit: contain;
+}
+
+.source-inline-image.is-person {
+  border-radius: 50%;
+  object-fit: cover;
+  background: #eeece5;
+}
+
+.source-inline-image.is-flag {
+  width: 18px;
+  height: 14px;
+  border-radius: 2px;
+}
+
+.source-table-section-row th,
+.in-depth-data-table .source-table-section-row th {
+  padding: 8px 12px;
+  color: var(--pitch);
+  background: #eeede4;
+  font: 500 9px var(--mono);
+  letter-spacing: .06em;
+  text-align: left;
+}
+
+.source-image-asset {
+  display: block;
+  width: auto;
+  max-width: 72px;
+  height: auto;
+  max-height: 72px;
+  object-fit: contain;
+}
+
+.source-text-entry.has-inline-images,
+.in-depth-source-copy.has-inline-images {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.team-content .source-image-block img,
+.in-depth-source-image img {
+  width: auto;
+  max-width: 64px;
+  max-height: 64px;
+  object-fit: contain;
+}

@@ -1,6 +1,7 @@
 import { ExternalLink, FileText } from 'lucide-react';
 import { Link } from 'wouter';
 import type { MatchContentPage } from '@workspace/api-client-react';
+import { SourceInlineImages } from '@/components/source-inline-images';
 
 type SourcePage = Pick<MatchContentPage, 'sourceUrl' | 'sections'> & { tab: string };
 
@@ -52,7 +53,7 @@ export function MatchSourceContent({ page, tab }: { page?: SourcePage; tab: stri
                     if (block.type === 'image' && block.imageUrl) {
                       const figure = (
                         <figure className="source-image-block" key={`image-${blockIndex}`}>
-                          <img src={block.imageUrl} alt={block.imageAlt || ''} loading="lazy" />
+                          <img className="source-image-asset" src={block.imageUrl} alt={block.imageAlt || ''} loading="lazy" />
                           {block.imageAlt && <figcaption>{block.imageAlt}</figcaption>}
                         </figure>
                       );
@@ -85,27 +86,37 @@ export function MatchSourceContent({ page, tab }: { page?: SourcePage; tab: stri
                               <thead><tr>{block.headers.map((header, headerIndex) => <th key={`${headerIndex}-${header}`}>{header}</th>)}</tr></thead>
                             ) : null}
                             <tbody>
-                              {block.rows?.map((row, rowIndex) => (
+                              {block.rows?.map((row, rowIndex) => block.rowTypes?.[rowIndex] === 'section' ? (
+                                <tr className="source-table-section-row" key={`row-${rowIndex}`}>
+                                  <th colSpan={Math.max(block.headers?.length ?? 0, 1)}>{row[0]}</th>
+                                </tr>
+                              ) : (
                                 <tr key={`row-${rowIndex}`}>
                                   {row.map((value, cellIndex) => {
-                                    const playerSlug = block.playerSlugs?.[rowIndex]?.[cellIndex];
-                                    const coachSlug = block.coachSlugs?.[rowIndex]?.[cellIndex];
+                                    const playerSlug = block.playerSlugs?.[rowIndex]?.[cellIndex] || undefined;
+                                    const coachSlug = block.coachSlugs?.[rowIndex]?.[cellIndex] || undefined;
+                                    const images = block.cellImages?.[rowIndex]?.[cellIndex];
                                     return (
                                       <td key={`${cellIndex}-${value}`}>
-                                        {playerSlug ? (
-                                          <Link href={`/player/${encodeURIComponent(playerSlug)}`} className="source-player-link">
-                                            {value}
-                                          </Link>
-                                        ) : coachSlug ? (
-                                          <a
-                                            href={`https://www.besoccer.com/coach/${encodeURIComponent(coachSlug)}`}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="source-coach-link"
-                                          >
-                                            {value}
-                                          </a>
-                                        ) : value}
+                                        <div className="source-table-cell">
+                                          <SourceInlineImages images={images} playerSlug={playerSlug} coachSlug={coachSlug} />
+                                          {value ? (
+                                            playerSlug ? (
+                                              <Link href={`/player/${encodeURIComponent(playerSlug)}`} className="source-player-link">
+                                                {value}
+                                              </Link>
+                                            ) : coachSlug ? (
+                                              <a
+                                                href={`https://www.besoccer.com/coach/${encodeURIComponent(coachSlug)}`}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="source-coach-link"
+                                              >
+                                                {value}
+                                              </a>
+                                            ) : <span>{value}</span>
+                                          ) : null}
+                                        </div>
                                       </td>
                                     );
                                   })}
@@ -117,7 +128,8 @@ export function MatchSourceContent({ page, tab }: { page?: SourcePage; tab: stri
                       );
                     }
                     return block.text ? (
-                      <p className="source-text-entry" key={`text-${blockIndex}`}>
+                      <p className={`source-text-entry${block.images?.length ? ' has-inline-images' : ''}`} key={`text-${blockIndex}`}>
+                        <SourceInlineImages images={block.images} playerSlug={block.playerSlug} coachSlug={block.coachSlug} />
                         {block.playerSlug ? (
                           <Link href={`/player/${encodeURIComponent(block.playerSlug)}`} className="source-player-link">
                             {block.text}
