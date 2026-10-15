@@ -5,15 +5,23 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { MatchContentBlockRowTypesItem } from './matchContentBlockRowTypesItem';
 import type { MatchContentBlockType } from './matchContentBlockType';
+import type { MatchContentImage } from './matchContentImage';
 
 export interface MatchContentBlock {
   type: MatchContentBlockType;
   text?: string;
   imageUrl?: string;
   imageAlt?: string;
+  /** Images associated with this text block, kept beside its label. */
+  images?: MatchContentImage[];
   headers?: string[];
   rows?: string[][];
+  /** Images kept in the same table row and column as their source cells. */
+  cellImages?: MatchContentImage[][][];
+  /** Identifies section-heading rows inside grouped tables. */
+  rowTypes?: MatchContentBlockRowTypesItem[];
   playerSlug?: string;
   playerSlugs?: ((string | null)[])[];
   coachSlug?: string;

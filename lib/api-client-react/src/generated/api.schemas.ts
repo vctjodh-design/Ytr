@@ -179,13 +179,32 @@ export const MatchContentBlockType = {
   table: 'table',
 } as const;
 
+export interface MatchContentImage {
+  url: string;
+  alt: string;
+}
+
+export type MatchContentBlockRowTypesItem = typeof MatchContentBlockRowTypesItem[keyof typeof MatchContentBlockRowTypesItem];
+
+
+export const MatchContentBlockRowTypesItem = {
+  data: 'data',
+  section: 'section',
+} as const;
+
 export interface MatchContentBlock {
   type: MatchContentBlockType;
   text?: string;
   imageUrl?: string;
   imageAlt?: string;
+  /** Images associated with this text block, kept beside its label. */
+  images?: MatchContentImage[];
   headers?: string[];
   rows?: string[][];
+  /** Images kept in the same table row and column as their source cells. */
+  cellImages?: MatchContentImage[][][];
+  /** Identifies section-heading rows inside grouped tables. */
+  rowTypes?: MatchContentBlockRowTypesItem[];
   playerSlug?: string;
   playerSlugs?: ((string | null)[])[];
   coachSlug?: string;

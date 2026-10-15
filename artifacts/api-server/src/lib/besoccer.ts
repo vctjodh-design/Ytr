@@ -2205,11 +2205,50 @@ function teamNodeHasClass(node: TeamHtmlNode, name: string): boolean {
 
 function teamNodeHidden(node: TeamHtmlNode): boolean {
   const classes = node.attrs.class ?? "";
+  const style = (node.attrs.style ?? "").replace(/\s+/g, "").toLowerCase();
   return (
     node.attrs.hidden !== undefined ||
     node.attrs["aria-hidden"] === "true" ||
+    /(?:^|;)display:none(?:;|$)/.test(style) ||
+    /(?:^|;)visibility:hidden(?:;|$)/.test(style) ||
     /\b(?:hidden|popup|advertisement|adunit|sticky)\b/i.test(classes)
   );
+}
+
+const teamContentControlTags = new Set([
+  "button",
+  "form",
+  "input",
+  "label",
+  "nav",
+  "option",
+  "select",
+  "textarea",
+]);
+
+function teamNodeIsControl(node: TeamHtmlNode): boolean {
+  if (teamContentControlTags.has(node.tag)) return true;
+  if (node.tag === "ul" && teamNodeHasClass(node, "panel-tab")) return true;
+  if (teamNodeHasClass(node, "share-media")) return true;
+  if (node.tag !== "a") return false;
+
+  const href = (node.attrs.href ?? "").trim();
+  return (
+    href.startsWith("#") ||
+    /^javascript:/i.test(href) ||
+    node.attrs["data-cy"] === "tab"
+  );
+}
+
+function teamNodeVisibleText(node: TeamHtmlNode): string {
+  if (teamNodeHidden(node) || teamNodeIsControl(node)) return "";
+  return node.children
+    .map((child) =>
+      typeof child === "string" ? decodeEntities(child) : teamNodeVisibleText(child),
+    )
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function imageUrlFromNode(node: TeamHtmlNode): string | null {
@@ -2221,6 +2260,50 @@ function imageUrlFromNode(node: TeamHtmlNode): string | null {
   } catch {
     return null;
   }
+}
+
+type TeamContentImage = NonNullable<TeamContentBlock["images"]>[number];
+
+function contentImageFromNode(node: TeamHtmlNode): TeamContentImage | null {
+  const url = imageUrlFromNode(node);
+  const alt = (node.attrs.alt ?? "").trim();
+  if (!url || /^(?:logo|team icon|icon|schedule|football pitch)$/i.test(alt)) {
+    return null;
+  }
+  return { url, alt };
+}
+
+function teamTabPanelVisibility(module: TeamHtmlNode): Set<string> {
+  const allTargets = new Set<string>();
+  const activeTargets = new Set<string>();
+  const visit = (
+    node: TeamHtmlNode,
+    insideTabList = false,
+    insideActiveTab = false,
+  ) => {
+    const inTabList =
+      insideTabList ||
+      (node.tag === "ul" && teamNodeHasClass(node, "panel-tab"));
+    const active =
+      insideActiveTab ||
+      (node.tag === "li" && teamNodeHasClass(node, "active"));
+
+    if (inTabList && node.tag === "a") {
+      const target = node.attrs.href?.match(/^#([a-z0-9_-]+)$/i)?.[1];
+      if (target && node.attrs["data-cy"] === "tab") {
+        allTargets.add(target);
+        if (active) activeTargets.add(target);
+      }
+    }
+
+    for (const child of node.children) {
+      if (typeof child !== "string") visit(child, inTabList, active);
+    }
+  };
+  visit(module);
+
+  if (activeTargets.size === 0) return new Set();
+  return new Set([...allTargets].filter((target) => !activeTargets.has(target)));
 }
 
 function playerSlugFromSourceUrl(sourceUrl: string): string | null {
@@ -2291,22 +2374,24 @@ function collectTeamBlocks(
   excludedHeading = "",
   playerSlug: string | null = null,
   coachSlug: string | null = null,
+  inactiveTabPanels: Set<string> = new Set(),
 ): void {
-  if (teamNodeHidden(node) || ["script", "style", "svg", "iframe", "noscript"].includes(node.tag)) {
+  if (
+    (node.attrs.id && inactiveTabPanels.has(node.attrs.id)) ||
+    teamNodeHidden(node) ||
+    teamNodeIsControl(node) ||
+    ["script", "style", "svg", "iframe", "noscript"].includes(node.tag)
+  ) {
     return;
   }
 
   if (node.tag === "img") {
-    const imageUrl = imageUrlFromNode(node);
-    const imageAlt = (node.attrs.alt ?? "").trim();
-    if (
-      imageUrl &&
-      !/^(?:logo|team icon|icon|schedule|football pitch)$/i.test(imageAlt)
-    ) {
+    const image = contentImageFromNode(node);
+    if (image) {
       blocks.push({
         type: "image",
-        imageUrl,
-        imageAlt,
+        imageUrl: image.url,
+        imageAlt: image.alt,
         ...(playerSlug ? { playerSlug } : {}),
         ...(coachSlug ? { coachSlug } : {}),
       });
@@ -2329,7 +2414,14 @@ function collectTeamBlocks(
           });
         }
       } else {
-        collectTeamBlocks(child, blocks, excludedHeading, linkedPlayer, linkedCoach);
+        collectTeamBlocks(
+          child,
+          blocks,
+          excludedHeading,
+          linkedPlayer,
+          linkedCoach,
+          inactiveTabPanels,
+        );
       }
     }
     return;

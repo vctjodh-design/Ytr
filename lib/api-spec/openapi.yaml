@@ -568,6 +568,15 @@ components:
           items:
             $ref: "#/components/schemas/MatchContentBlock"
       required: [title, text, tables]
+    MatchContentImage:
+      type: object
+      properties:
+        url:
+          type: string
+          format: uri
+        alt:
+          type: string
+      required: [url, alt]
     MatchContentBlock:
       type: object
       properties:
@@ -581,6 +590,11 @@ components:
           format: uri
         imageAlt:
           type: string
+        images:
+          type: array
+          description: Images associated with this text block, kept beside its label.
+          items:
+            $ref: "#/components/schemas/MatchContentImage"
         headers:
           type: array
           items:
@@ -591,6 +605,21 @@ components:
             type: array
             items:
               type: string
+        cellImages:
+          type: array
+          description: Images kept in the same table row and column as their source cells.
+          items:
+            type: array
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/MatchContentImage"
+        rowTypes:
+          type: array
+          description: Identifies section-heading rows inside grouped tables.
+          items:
+            type: string
+            enum: [data, section]
         playerSlug:
           type: string
         playerSlugs:

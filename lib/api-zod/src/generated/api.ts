@@ -199,8 +199,17 @@ export const GetMatchDetailsResponse = zod.object({
   "text": zod.string().optional(),
   "imageUrl": zod.string().url().optional(),
   "imageAlt": zod.string().optional(),
+  "images": zod.array(zod.object({
+  "url": zod.string().url(),
+  "alt": zod.string()
+})).optional().describe('Images associated with this text block, kept beside its label.'),
   "headers": zod.array(zod.string()).optional(),
   "rows": zod.array(zod.array(zod.string())).optional(),
+  "cellImages": zod.array(zod.array(zod.array(zod.object({
+  "url": zod.string().url(),
+  "alt": zod.string()
+})))).optional().describe('Images kept in the same table row and column as their source cells.'),
+  "rowTypes": zod.array(zod.enum(['data', 'section'])).optional().describe('Identifies section-heading rows inside grouped tables.'),
   "playerSlug": zod.string().optional(),
   "playerSlugs": zod.array(zod.array(zod.string().nullable())).optional(),
   "coachSlug": zod.string().optional(),
@@ -330,8 +339,17 @@ export const GetTeamDetailsResponse = zod.object({
   "text": zod.string().optional(),
   "imageUrl": zod.string().url().optional(),
   "imageAlt": zod.string().optional(),
+  "images": zod.array(zod.object({
+  "url": zod.string().url(),
+  "alt": zod.string()
+})).optional().describe('Images associated with this text block, kept beside its label.'),
   "headers": zod.array(zod.string()).optional(),
   "rows": zod.array(zod.array(zod.string())).optional(),
+  "cellImages": zod.array(zod.array(zod.array(zod.object({
+  "url": zod.string().url(),
+  "alt": zod.string()
+})))).optional().describe('Images kept in the same table row and column as their source cells.'),
+  "rowTypes": zod.array(zod.enum(['data', 'section'])).optional().describe('Identifies section-heading rows inside grouped tables.'),
   "playerSlug": zod.string().optional(),
   "playerSlugs": zod.array(zod.array(zod.string().nullable())).optional(),
   "coachSlug": zod.string().optional(),
@@ -438,8 +456,17 @@ export const GetPlayerDetailsResponse = zod.object({
   "text": zod.string().optional(),
   "imageUrl": zod.string().url().optional(),
   "imageAlt": zod.string().optional(),
+  "images": zod.array(zod.object({
+  "url": zod.string().url(),
+  "alt": zod.string()
+})).optional().describe('Images associated with this text block, kept beside its label.'),
   "headers": zod.array(zod.string()).optional(),
   "rows": zod.array(zod.array(zod.string())).optional(),
+  "cellImages": zod.array(zod.array(zod.array(zod.object({
+  "url": zod.string().url(),
+  "alt": zod.string()
+})))).optional().describe('Images kept in the same table row and column as their source cells.'),
+  "rowTypes": zod.array(zod.enum(['data', 'section'])).optional().describe('Identifies section-heading rows inside grouped tables.'),
   "playerSlug": zod.string().optional(),
   "playerSlugs": zod.array(zod.array(zod.string().nullable())).optional(),
   "coachSlug": zod.string().optional(),
