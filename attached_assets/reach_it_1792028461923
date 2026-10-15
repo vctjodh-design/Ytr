@@ -1,0 +1,311 @@
+#!/usr/bin/env python3
+"""
+cloudflare_solver.py — single-file bot-protection solver.
+
+Gets past the "403 Forbidden" / "Client Challenge" pages that Cloudflare,
+Fastly and similar CDNs serve to plain HTTP clients, so you can read the
+real page and its JSON endpoints.
+
+HOW IT WORKS (layers, cheapest first)
+  1. curl_cffi TLS/JA3 impersonation — mimics a real browser's TLS + HTTP/2
+     fingerprint. This is what actually defeats besoccer.com.
+  2. cloudscraper — solves classic Cloudflare JS challenges.
+  3. FlareSolverr — drives a real browser over HTTP (set FLARESOLVERR_URL).
+
+INSTALL (on a phone: Termux / Pydroid 3 / any Python 3.9+)
+    pip install curl_cffi cloudscraper requests
+
+USAGE
+    python cloudflare_solver.py <url>
+    python cloudflare_solver.py <url> --json
+    python cloudflare_solver.py <url> -o page.html
+    python cloudflare_solver.py <url> --fingerprint chrome110
+
+    # as a library
+    from cloudflare_solver import BotProtectionSolver
+    solver = BotProtectionSolver()
+    r = solver.get("https://www.besoccer.com/coach/andoni-iraola-18247")
+    print(r.text)
+
+NOTE: This is for pages you are allowed to access. Respect each site's
+terms of service and robots.txt, and prefer an official API when one
+exists (e.g. api.besoccer.com) for anything beyond personal use.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json as _json
+import os
+import sys
+from dataclasses import dataclass, field
+from typing import Any
+
+__version__ = "1.0.0"
+
+# Fingerprints verified against besoccer.com.  Newer Chrome profiles
+# (chrome124/chrome120) currently receive the Fastly challenge, so the
+# list below is the one that works today; rotate if the site changes.
+WORKING_FINGERPRINTS = [
+    "chrome110",
+    "chrome116",
+    "edge101",
+    "safari17_0",
+    "safari15_5",
+    "firefox133",
+]
+
+BROWSER_HEADERS = {
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Upgrade-Insecure-Requests": "1",
+}
+
+# Markers of a bot-protection interstitial rather than the real page.
+_CHALLENGE_MARKERS = (
+    "_fs-ch-",              # Fastly "Client Challenge"
+    "Client Challenge",
+    "Just a moment",        # Cloudflare
+    "cf-browser-verification",
+    "Checking your browser",
+    "Attention Required",   # Cloudflare block page
+    "/cdn-cgi/challenge-platform",
+)
+
+# A real content page is large; a tiny 200 that is HTML is a challenge stub.
+_MIN_REAL_BODY = 20_000
+
+
+class SolveError(RuntimeError):
+    """No configured layer could retrieve the resource."""
+
+
+class BlockedError(SolveError):
+    """Every layer returned a bot-protection interstitial or 403."""
+
+
+@dataclass
+class Response:
+    """Result of a fetch, independent of which layer produced it."""
+
+    url: str
+    status: int
+    text: str
+    headers: dict = field(default_factory=dict)
+    layer: str = ""
+    fingerprint: str | None = None
+
+    @property
+    def content(self) -> bytes:
+        return self.text.encode("utf-8", "replace")
+
+    def json(self) -> Any:
+        return _json.loads(self.text)
+
+
+def is_challenge(text: str, status: int = 200) -> bool:
+    """True if ``text`` looks like a bot-protection interstitial."""
+    if status in (403, 429, 503):
+        return True
+    if not text:
+        return True
+    head = text[:4000]
+    if any(marker in head for marker in _CHALLENGE_MARKERS):
+        return True
+    low = head.lower()
+    return (
+        status == 200
+        and len(text) < _MIN_REAL_BODY
+        and "<html" in low
+        and "besoccer" not in low
+    )
+
+
+class BotProtectionSolver:
+    """Layered fetcher that gets past Cloudflare/Fastly bot protection."""
+
+    def __init__(
+        self,
+        fingerprints: list | None = None,
+        timeout: float = 30.0,
+        flaresolverr_url: str | None = None,
+        proxies: dict | None = None,
+    ) -> None:
+        self.fingerprints = fingerprints or list(WORKING_FINGERPRINTS)
+        self.timeout = timeout
+        self.flaresolverr_url = flaresolverr_url or os.environ.get("FLARESOLVERR_URL")
+        self.proxies = proxies
+        self.last_layer: str | None = None
+        self._curl = None
+        self._cloudscraper = None
+
+    # -- layer 1: TLS impersonation ------------------------------------------
+    def _curl_cffi(self, url: str, fingerprint: str, **kwargs: Any) -> Response:
+        from curl_cffi import requests as creq
+
+        if self._curl is None:
+            self._curl = creq.Session(impersonate=fingerprint)
+        self._curl.headers.update(BROWSER_HEADERS)
+        r = self._curl.get(
+            url, timeout=self.timeout, allow_redirects=True,
+            proxies=self.proxies, **kwargs,
+        )
+        return Response(
+            url=str(r.url), status=r.status_code, text=r.text,
+            headers=dict(r.headers), layer="curl_cffi", fingerprint=fingerprint,
+        )
+
+    # -- layer 2: cloudscraper ------------------------------------------------
+    def _cloudscraper(self, url: str, **kwargs: Any) -> Response:
+        import cloudscraper
+
+        if self._cloudscraper is None:
+            self._cloudscraper = cloudscraper.create_scraper(
+                browser={"browser": "chrome", "platform": "windows", "mobile": False}
+            )
+            self._cloudscraper.headers.update(BROWSER_HEADERS)
+        r = self._cloudscraper.get(url, timeout=self.timeout, **kwargs)
+        return Response(
+            url=r.url, status=r.status_code, text=r.text,
+            headers=dict(r.headers), layer="cloudscraper",
+        )
+
+    # -- layer 3: FlareSolverr (real browser) ---------------------------------
+    def _flaresolverr(self, url: str, **kwargs: Any) -> Response:
+        import requests
+
+        payload = {"cmd": "request.get", "url": url, "maxTimeout": int(self.timeout * 1000)}
+        r = requests.post(self.flaresolverr_url, json=payload, timeout=self.timeout + 15)
+        r.raise_for_status()
+        sol = r.json().get("solution", {})
+        return Response(
+            url=sol.get("url", url), status=sol.get("status", 200),
+            text=sol.get("response", ""), headers=sol.get("headers", {}),
+            layer="flaresolverr",
+        )
+
+    # -- orchestration --------------------------------------------------------
+    def get(self, url: str, *, expect_json: bool = False,
+            raise_on_block: bool = True, **kwargs: Any) -> Response:
+        """Fetch ``url``, trying each layer until one returns real content."""
+        errors: list = []
+        best: Response | None = None
+
+        for fingerprint in self.fingerprints:
+            try:
+                resp = self._curl_cffi(url, fingerprint, **kwargs)
+            except Exception as exc:
+                errors.append(f"curl_cffi[{fingerprint}]: {type(exc).__name__}: {exc}")
+                continue
+            best = resp
+            if not is_challenge(resp.text, resp.status):
+                self.last_layer = resp.layer
+                return resp
+            errors.append(
+                f"curl_cffi[{fingerprint}]: HTTP {resp.status} "
+                f"(challenge, {len(resp.text)} bytes)"
+            )
+
+        if not expect_json:  # cloudscraper returns HTML only
+            try:
+                resp = self._cloudscraper(url, **kwargs)
+                best = best or resp
+                if not is_challenge(resp.text, resp.status):
+                    self.last_layer = resp.layer
+                    return resp
+                errors.append(f"cloudscraper: HTTP {resp.status} (challenge)")
+            except Exception as exc:
+                errors.append(f"cloudscraper: {type(exc).__name__}: {exc}")
+
+        if self.flaresolverr_url:
+            try:
+                resp = self._flaresolverr(url, **kwargs)
+                best = resp
+                if not is_challenge(resp.text, resp.status):
+                    self.last_layer = resp.layer
+                    return resp
+                errors.append(f"flaresolverr: HTTP {resp.status} (challenge)")
+            except Exception as exc:
+                errors.append(f"flaresolverr: {type(exc).__name__}: {exc}")
+
+        if not raise_on_block and best is not None:
+            return best
+        raise BlockedError("All layers blocked for %s:\n  - %s" % (url, "\n  - ".join(errors)))
+
+    def get_json(self, url: str, **kwargs: Any) -> Any:
+        return self.get(url, expect_json=True, **kwargs).json()
+
+    def close(self) -> None:
+        for session in (self._curl, self._cloudscraper):
+            try:
+                session.close()
+            except Exception:
+                pass
+
+    def __enter__(self) -> "BotProtectionSolver":
+        return self
+
+    def __exit__(self, *exc: Any) -> None:
+        self.close()
+
+
+def _install_hint(exc: ImportError) -> str:
+    missing = getattr(exc, "name", None) or "a dependency"
+    return (
+        f"\nMissing dependency: {missing}\n"
+        "Install with:  pip install curl_cffi cloudscraper requests\n"
+        "(cloudscraper is only needed for Cloudflare JS challenges; "
+        "curl_cffi alone handles besoccer.com.)\n"
+    )
+
+
+def main(argv: list | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        prog="cloudflare_solver.py",
+        description="Fetch a URL past Cloudflare/Fastly bot protection.",
+    )
+    parser.add_argument("url", help="URL to fetch")
+    parser.add_argument("--json", action="store_true", help="pretty-print the response as JSON")
+    parser.add_argument("-o", "--output", help="write the response body to this file")
+    parser.add_argument("--fingerprint", action="append", dest="fingerprints",
+                        help="TLS profile to try (repeatable); default: built-in list")
+    parser.add_argument("--timeout", type=float, default=30.0, help="timeout in seconds")
+    parser.add_argument("--show", action="store_true", help="print the body to stdout")
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
+    args = parser.parse_args(argv)
+
+    try:
+        solver = BotProtectionSolver(
+            fingerprints=args.fingerprints, timeout=args.timeout
+        )
+        resp = solver.get(args.url, expect_json=args.json, raise_on_block=False)
+    except ImportError as exc:
+        sys.stderr.write(_install_hint(exc))
+        return 2
+
+    sys.stderr.write(
+        f"[{resp.layer}"
+        + (f"/{resp.fingerprint}" if resp.fingerprint else "")
+        + f"] HTTP {resp.status}  {len(resp.text)} bytes  {resp.url}\n"
+    )
+
+    body = resp.text
+    if args.json:
+        try:
+            body = _json.dumps(resp.json(), indent=2, ensure_ascii=False)
+        except ValueError:
+            sys.stderr.write("warning: response is not valid JSON; writing raw body\n")
+
+    if args.output:
+        with open(args.output, "w", encoding="utf-8") as fh:
+            fh.write(body)
+        sys.stderr.write(f"saved to {args.output}\n")
+    elif args.show or not args.json:
+        sys.stdout.write(body + "\n")
+
+    return 0 if not is_challenge(resp.text, resp.status) else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+    
