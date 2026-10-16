@@ -146,14 +146,75 @@ function ResultMark({ result }: { result: 'W' | 'D' | 'L' }) {
   return <span className={`in-depth-form-mark is-${result.toLowerCase()}`}>{result}</span>;
 }
 
+function parseCoachRecord(section: MatchContentSection) {
+  if (!/coach\s+statistics/i.test(section.title)) return null;
+  const textBlocks = (section.blocks ?? [])
+    .filter((block) => block.type === 'text' && block.text)
+    .map((block) => block.text?.trim() ?? '')
+    .filter(Boolean);
+  const matchesIndex = textBlocks.findIndex((text) => /^matches$/i.test(text));
+  const totalMatches = Number(textBlocks[matchesIndex - 1]);
+  if (matchesIndex < 1 || !Number.isInteger(totalMatches) || totalMatches < 0) return null;
+
+  const stats = textBlocks.slice(matchesIndex + 1);
+  const counts = stats.filter((text) => /^\d+$/.test(text)).map(Number);
+  const percentages = stats
+    .map((text) => text.match(/^(\d+(?:[.,]\d+)?)%$/)?.[1]?.replace(',', '.'))
+    .filter((value): value is string => Boolean(value));
+  if (
+    counts.length < 3
+    || percentages.length < 3
+    || counts[0] + counts[1] + counts[2] !== totalMatches
+  ) {
+    return null;
+  }
+
+  return {
+    totalMatches,
+    wins: counts[0],
+    winRate: percentages[0],
+    draws: counts[1],
+    drawRate: percentages[1],
+    losses: counts[2],
+    lossRate: percentages[2],
+  };
+}
+
 function SourceSection({ section }: { section: MatchContentSection }) {
   const hasBlocks = Boolean(section.blocks?.length);
+  const coachRecord = parseCoachRecord(section);
   return (
     <article className="in-depth-source-section" data-testid={`source-section-${section.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}>
       <h4>{section.title}</h4>
       {hasBlocks ? (
         <div className="in-depth-source-body">
+          {coachRecord && (
+            <div className="coach-record-summary" data-testid="coach-record-summary">
+              <div className="coach-record-grid">
+                <div className="coach-record-stat">
+                  <span>Total matches</span>
+                  <strong>{coachRecord.totalMatches}</strong>
+                </div>
+                <div className="coach-record-stat">
+                  <span>Wins</span>
+                  <strong>{coachRecord.wins}</strong>
+                  <small>{coachRecord.winRate}%</small>
+                </div>
+                <div className="coach-record-stat">
+                  <span>Draws</span>
+                  <strong>{coachRecord.draws}</strong>
+                  <small>{coachRecord.drawRate}%</small>
+                </div>
+                <div className="coach-record-stat">
+                  <span>Losses</span>
+                  <strong>{coachRecord.losses}</strong>
+                  <small>{coachRecord.lossRate}%</small>
+                </div>
+              </div>
+            </div>
+          )}
           {section.blocks?.map((block, index) => {
+            if (coachRecord && !(block.type === 'text' && block.coachSlug)) return null;
             if (block.type === 'image' && block.imageUrl) {
               const image = (
                 <figure className="in-depth-source-image" key={`image-${index}`}>

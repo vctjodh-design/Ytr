@@ -4409,3 +4409,53 @@ a {
   max-height: 64px;
   object-fit: contain;
 }
+
+.coach-record-summary {
+  padding: 12px;
+  border-bottom: 1px solid #d9ddd2;
+}
+
+.coach-record-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.coach-record-stat {
+  display: flex;
+  min-width: 0;
+  min-height: 78px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 9px 5px;
+  border: 1px solid #e1e2d9;
+  background: #fbfaf6;
+  text-align: center;
+}
+
+.coach-record-stat span {
+  color: #657065;
+  font: 500 8px var(--mono);
+  letter-spacing: .04em;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+.coach-record-stat strong {
+  color: var(--pitch);
+  font-size: 22px;
+  line-height: 1;
+}
+
+.coach-record-stat small {
+  color: #757b72;
+  font-size: 9px;
+}
+
+@media (max-width: 600px) {
+  .coach-record-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

@@ -1,5 +1,6 @@
 - [BeSoccer fixture lists](besoccer-fixtures.md) — paginate to the final marker, include unmarked AJAX cards, and preserve source-local dates for upcoming-date labels.
 - [BeSoccer match rounds](besoccer-rounds.md) — public match-table reload supports historical standings; the match page does not expose the mobile round-fixture selector.
 - [BeSoccer team content](besoccer-team-content.md) — parse team tabs from ordered HTML modules; markdown collapses images and page structure.
+- [BeSoccer coach data](besoccer-coach-data.md) — team-page modules contain career W/D/L; full seasonal detail requires the separate coach profile.
 - [BeSoccer player names](besoccer-player-content.md) — JSON-LD can identify the site, not the player; validate it and prefer the page title or portrait alt.
 - [API Zod barrel](api-zod-barrel.md) — avoid wildcard re-exports of generated operation parameter types beside same-named Zod schemas.
